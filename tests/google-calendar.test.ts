@@ -144,13 +144,18 @@ test("getAccessToken error message does not contain secrets", async () => {
 });
 
 test("JWT assertion has correct claims and header per Google spec", async () => {
+  const tokenEndpoint = "https://oauth2.googleapis.com/token";
   let capturedAssertion = "";
   globalThis.fetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const input = _input instanceof Request ? _input.url : String(_input);
+    assert.equal(input, tokenEndpoint);
+    assert.equal(init?.method, "POST");
+    assert.equal(new Headers(init?.headers).get("content-type"), "application/x-www-form-urlencoded");
     const body = init?.body;
-    if (body instanceof URLSearchParams) {
-      capturedAssertion = body.get("assertion") ?? "";
-      assert.equal(body.get("grant_type"), "urn:ietf:params:oauth:2.0:jwt-bearer");
-    }
+    assert.ok(body instanceof URLSearchParams, "token request body must be URLSearchParams");
+    assert.equal(body.get("grant_type"), "urn:ietf:params:oauth:grant-type:jwt-bearer");
+    capturedAssertion = body.get("assertion") ?? "";
+    assert.ok(capturedAssertion, "assertion must be present");
     return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }));
   };
 

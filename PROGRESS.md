@@ -15,11 +15,11 @@
 | ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
 | Cloudflare Access 認証 | 実装済み・本番未検証 | JWT検証→Supabase allowlist→SSRセッション発行。13テストは成功済み。未許可メールには管理者登録依頼とGoogle再ログインの案内を返す。Cloudflare Dashboard/本番Secretは未設定。 |
 | Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solutions.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
-| Google Calendar同期（MVP） | 実装済み・DB適用済み・要デプロイ | サービスアカウント経由の一方向同期（アプリ→Google Calendar）。トークンエンドポイントのエラー詳細取得（`error`/`error_description`を安全に抽出、機密は非出力）、JWT iat/expの明示的秒指定、Google仕様との照合テスト追加済み。`0008` DB適用済み、`GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`（Secret）/ `GOOGLE_CALENDAR_ID`（Variable）設定済み。デプロイ後に再同期して400エラーの詳細を確認する。 |
+| Google Calendar同期（MVP） | 実装済み・DB適用済み・要デプロイ | サービスアカウント経由の一方向同期（アプリ→Google Calendar）。`grant_type`誤り（`oauth:2.0:jwt-bearer`→`oauth:grant-type:jwt-bearer`）を修正済み。トークンエンドポイントのエラー詳細取得、JWT iat/expの明示的秒指定、Google仕様との照合テスト追加済み。`0008` DB適用済み、`GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`（Secret）/ `GOOGLE_CALENDAR_ID`（Variable）設定済み。 |
 
 ### 次に行うこと（優先順）
 
-1. トークン交換エラー修正をデプロイし、イベント `8876b115-e0c6-4165-821c-3d62a0b803fb` の再同期でエラー詳細を確認する。エラー内容に応じて原因（鍵フォーマット、権限等）を特定・修正する。
+1. トークン交換エラー修正をデプロイし、イベント `8876b115-e0c6-4165-821c-3d62a0b803fb` の再同期で成功を確認する。
 2. Cloudflare DashboardでWorker runtime Variables/Secret、Custom Domain、Access Applicationを設定し、stagingまたは本番前のE2Eを行う。デプロイはユーザー承認後にのみ実施する。
 3. 実Supabaseの migration `0005` / `0006` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
 4. 実機E2E（モバイル含む）を行う。ログイン、空き時間の下書き→確定→再読込→削除、他メンバー閲覧、企画、イベント参加、管理画面を確認する。
@@ -100,15 +100,17 @@
 
 ### Google Calendar同期: トークン交換エラー修正（2026-08-07）
 
-- **変更理由**: デプロイ後、イベント同期がHTTP 400で失敗。`getAccessToken`がGoogleのエラーレスポンス本文を破棄していたため原因不明だった。
+- **根本原因**: Google OAuth JWT Bearerの`grant_type`を`urn:ietf:params:oauth:2.0:jwt-bearer`と誤指定していた。正しくは`urn:ietf:params:oauth:grant-type:jwt-bearer`。
 - **修正内容**:
+  - `src/lib/google-calendar.ts`のtoken requestを正しいgrant typeへ修正。Secret、Calendar ID、Supabase migrationは変更していない。
   - `parseTokenError`関数を追加: Googleのレスポンスから`error`/`error_description`を安全に抽出（JSONパース失敗時はプレーンテキストを500文字に制限・サニタイズ）
   - JWT `iat`/`exp`を`Math.floor(Date.now() / 1000)`で明示的に秒指定（jose内部は正しいが曖昧さを排除）
   - assertion、JWT、private_key、client_email、アクセストークン、サービスアカウントJSONはエラーメッセージ・ログ・DB・レスポンスへ出力しない
-- **追加テスト**: JSONエラー詳細抽出、エラー内の機密非含有、JWTクレーム/ヘッダーのGoogle仕様準拠（iss, scope, aud, iat秒, exp=iat+3600, sub/nbf未設定, alg RS256, typ JWT）
+- **追加テスト**: token endpoint URL、POST、Content-Type、assertion存在、`grant_type`の完全一致（誤った旧文字列との不一致を含む）、JSONエラー詳細抽出、エラー内の機密非含有、JWTクレーム/ヘッダーのGoogle仕様準拠（iss, scope, aud, iat秒, exp=iat+3600, sub/nbf未設定, alg RS256, typ JWT）
 - **変更ファイル**: `src/lib/google-calendar.ts`、`tests/google-calendar.test.ts`、`PROGRESS.md`
 - **検証**: `npm test` 40件合格、`npm run lint`、`npm run build`、`npm run build:worker` 成功
-- **次のステップ**: デプロイ後にイベント再同期→エラー詳細から原因を特定して対処
+- **根本原因確定**: Google OAuth JWT Bearerの`grant_type`がRFC仕様と異なっていた（`urn:ietf:params:oauth:2.0:jwt-bearer`→正しくは`urn:ietf:params:oauth:grant-type:jwt-bearer`）。これがtoken exchange 400エラーの唯一の原因。
+- **次のステップ**: デプロイ後にイベント`8876b115-e0c6-4165-821c-3d62a0b803fb`を再同期して成功を確認する
 
 ### Cloudflare Workers移行（実装済み・未デプロイ）
 
