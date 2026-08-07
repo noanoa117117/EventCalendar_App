@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { addDays, format, isToday, startOfWeek } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
-import Link from "next/link";
 import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { addDevEvent } from "@/lib/dev-auth";
@@ -14,6 +13,7 @@ import type { Profile, Slot } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { AppHeader } from "@/components/app-header";
 
 const durations = [30, 60, 90, 120] as const;
 
@@ -148,16 +148,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
 
   return (
     <main className="min-h-dvh bg-muted/20">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 shadow-sm md:px-8">
-        <div>
-          <h1 className="text-lg font-semibold">イベント企画</h1>
-          <p className="text-xs text-muted-foreground">全員の空き時間から候補を表示</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/events" className="text-sm text-muted-foreground underline-offset-4 hover:underline">カレンダー</Link>
-          <Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き時間</Link>
-        </div>
-      </header>
+      <AppHeader current="planning" />
 
       <div className="mx-auto max-w-3xl p-4 md:p-6">
         {/* Member selection */}

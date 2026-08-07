@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks } from "date-fns";
 import { ja } from "date-fns/locale";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
-import { CalendarDays, ChevronLeft, ChevronRight, CircleX, Pencil, Plus, Users, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CircleX, Pencil, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SignOutButton } from "@/components/sign-out-button";
+import { AppHeader } from "@/components/app-header";
 import { useRouter } from "next/navigation";
 
 type Event = Database["public"]["Tables"]["events"]["Row"];
@@ -111,10 +112,12 @@ export function EventCalendar({ currentUser, initialEvents, initialParticipants,
   }
 
   return <main className={`${compact ? "min-h-0" : "min-h-dvh"} bg-muted/20`}>
-    {!compact && <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 shadow-sm md:px-8">
-      <div className="flex items-center gap-2"><CalendarDays className="size-5" /><h1 className="text-lg font-semibold">イベントカレンダー</h1><span className="text-sm text-muted-foreground">{currentUser.nickname}</span></div>
-      <div className="flex items-center gap-2"><Link href="/planning" className="text-sm text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link><Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き時間を登録・確認</Link>{(role === "admin" || role === "super_user") && <Link href="/admin" className="text-sm text-muted-foreground underline-offset-4 hover:underline">管理</Link>}{preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}<Button size="sm" onClick={() => setCreationChoiceOpen(true)}><Plus /> イベント作成</Button>{!preview && <SignOutButton variant="ghost" />}</div>
-    </header>}
+    {!compact && <AppHeader current="events">
+      {(role === "admin" || role === "super_user") && <Link href="/admin" className="text-sm text-muted-foreground underline-offset-4 hover:underline">管理</Link>}
+      {preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}
+      <Button size="sm" onClick={() => setCreationChoiceOpen(true)}><Plus /> イベント作成</Button>
+      {!preview && <SignOutButton variant="ghost" />}
+    </AppHeader>}
     <div className={`mx-auto grid max-w-7xl gap-4 p-4 ${compact ? "grid-cols-1" : "md:grid-cols-[1fr_320px] md:p-8"}`}>
       <section className="overflow-hidden rounded-xl border bg-background shadow-sm">
         <div className="flex items-center justify-between border-b p-3"><div className="flex items-center gap-1"><Button variant="ghost" size="icon" onClick={() => setCursor((d) => view === "month" ? subMonths(d, 1) : subWeeks(d, 1))}><ChevronLeft /></Button><Button variant="ghost" size="icon" onClick={() => setCursor((d) => view === "month" ? addMonths(d, 1) : addWeeks(d, 1))}><ChevronRight /></Button><Button variant="outline" size="sm" onClick={() => setCursor(asJstCalendarDate(new Date()))}>今日</Button><h2 className="ml-2 font-semibold">{view === "month" ? format(cursor, "yyyy年M月", { locale: ja }) : `${format(days[0], "M/d")} - ${format(days.at(-1)!, "M/d")}`}</h2></div><div className="flex rounded-lg border p-0.5 text-sm"><button className={`rounded px-2 py-1 ${view === "month" ? "bg-muted font-medium" : ""}`} onClick={() => setView("month")}>月</button><button className={`rounded px-2 py-1 ${view === "week" ? "bg-muted font-medium" : ""}`} onClick={() => setView("week")}>週</button></div></div>

@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
+import { AppHeader } from "@/components/app-header";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -198,11 +199,7 @@ export function AvailabilityBoard({
   return (
     <div className={`flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col bg-border`}>
       {preview && !compact && <div className="bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-800">ローカルモック（Supabaseには接続しません）</div>}
-      {!compact && <nav aria-label="メインナビゲーション" className="flex items-center gap-4 border-b bg-background px-4 py-2 text-sm shadow-sm">
-        <Link href="/events" onClick={(e) => { if (hasDraft && !window.confirm("未保存の変更があります。移動しますか？")) e.preventDefault(); }} className="text-muted-foreground underline-offset-4 hover:underline">イベントカレンダー</Link>
-        <Link href="/planning" onClick={(e) => { if (hasDraft && !window.confirm("未保存の変更があります。移動しますか？")) e.preventDefault(); }} className="text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link>
-        <span className="font-medium">空き時間を登録・確認</span>
-      </nav>}
+      {!compact && <AppHeader current="availability" onBeforeNavigate={() => !hasDraft || window.confirm("未保存の変更があります。移動しますか？")} />}
       <div className={`flex items-center border-b bg-background px-3 py-2 ${compact ? "" : "md:hidden"}`}>
         <Tabs value={mobilePanel} onValueChange={(v) => setMobilePanel(v as typeof mobilePanel)} className="flex-1">
           <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger></TabsList>
@@ -323,8 +320,7 @@ export function AvailabilityBoard({
 
       </main>
 
-      {/* Desktop: right sidebar preset panel */}
-      <aside className={`${mobilePanel === "calendar" ? "min-h-0 overflow-hidden p-3" : "hidden"} bg-background ${compact ? "max-h-40" : "md:block md:overflow-y-auto md:p-4"}`}>
+      <aside className={`${mobilePanel === "calendar" ? "min-h-0 overflow-y-auto border-t p-3 md:border-t-0" : "hidden"} bg-background ${compact ? "max-h-40" : "md:block md:p-4"}`}>
         <PresetPanel
           userId={currentUser.id}
           presets={presets}
