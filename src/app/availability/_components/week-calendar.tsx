@@ -136,81 +136,110 @@ export function WeekCalendar({
   }, []);
 
   const memberCount = Math.max(orderedVisible.length, 1);
+  const [mobileDay, setMobileDay] = useState(0);
+
+  function renderDayColumn(day: Date) {
+    const dateStr = format(day, "yyyy-MM-dd");
+    const editable = isEditable(dateStr);
+    return (
+      <div key={dateStr} className="relative flex border-l flex-1">
+        {orderedVisible.map((m) => (
+          <div key={m.id} className="relative" style={{ width: `${100 / memberCount}%` }}>
+            {Array.from({ length: ROWS }, (_, row) => {
+              const covered = (slotsByUserDate.get(`${m.id}|${dateStr}`) ?? []).some((s) =>
+                slotCoversRow(s, row * 30, (row + 1) * 30),
+              );
+              const isOwn = m.id === currentUserId;
+              const inPendingDrag =
+                isOwn &&
+                dragDate === dateStr &&
+                dragRows &&
+                row >= dragRows[0] &&
+                row <= dragRows[1];
+
+              return (
+                <div
+                  key={row}
+                  data-week-date={dateStr}
+                  data-week-row={row}
+                  onPointerDown={() => isOwn && canEdit && handleDown(dateStr, row)}
+                  onPointerEnter={() => isOwn && canEdit && handleEnter(dateStr, row)}
+                  className={cn(
+                    "h-11 border-b border-r border-dashed border-muted-foreground/10 touch-none",
+                    row % 4 === 0 && "border-t border-solid border-muted-foreground/20",
+                    isOwn && editable && "cursor-pointer",
+                    !editable && isOwn && "bg-muted/40",
+                  )}
+                  style={{
+                    backgroundColor: covered ? `${m.color}` + (isOwn ? "cc" : "66") : undefined,
+                    outline: inPendingDrag ? `2px solid ${m.color}` : undefined,
+                    outlineOffset: -2,
+                  }}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  const timeLabels = (
+    <div className="text-right">
+      {Array.from({ length: ROWS }, (_, row) => (
+        <div key={row} className="h-11 pr-1 text-[10px] leading-[2.75rem] text-muted-foreground">
+          {row % 4 === 0 ? `${String(row / 2).padStart(2, "0")}:00` : ""}
+        </div>
+      ))}
+    </div>
+  );
 
   return (
-    <div className="flex h-full flex-col overflow-auto">
-      <div className="min-w-[760px]">
-      <div
-        className="grid border-b text-center text-xs font-medium text-muted-foreground"
-        style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}
-      >
-        <div />
-        {days.map((day) => {
-          const dateStr = format(day, "yyyy-MM-dd");
-          return (
-            <div key={dateStr} className={cn("py-2", !isEditable(dateStr) && "text-muted-foreground/60")}>
-              {WEEKDAY_LABELS[day.getDay()]}
-              <div>{format(day, "M/d", { locale: ja })}</div>
-            </div>
-          );
-        })}
+    <div className="flex h-full flex-col">
+      {/* Mobile: single day with day picker */}
+      <div className="flex flex-col md:hidden h-full">
+        <div className="grid grid-cols-7 border-b text-center text-xs font-medium">
+          {days.map((day, i) => {
+            const dateStr = format(day, "yyyy-MM-dd");
+            return (
+              <button key={dateStr} onClick={() => setMobileDay(i)}
+                className={cn("py-2 transition-colors", mobileDay === i ? "bg-primary/10 font-bold text-primary" : !isEditable(dateStr) ? "text-muted-foreground/60" : "text-muted-foreground")}>
+                {WEEKDAY_LABELS[day.getDay()]}
+                <div>{format(day, "d")}</div>
+              </button>
+            );
+          })}
+        </div>
+        <div className="flex flex-1 overflow-y-auto">
+          <div className="w-10 shrink-0">{timeLabels}</div>
+          {renderDayColumn(days[mobileDay])}
+        </div>
       </div>
 
-      <div className="grid flex-1" style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}>
-        <div className="text-right">
-          {Array.from({ length: ROWS }, (_, row) => (
-            <div key={row} className="h-11 pr-1 text-[10px] leading-[2.75rem] text-muted-foreground">
-              {row % 4 === 0 ? `${String(row / 2).padStart(2, "0")}:00` : ""}
-            </div>
-          ))}
+      {/* Desktop: 7-column grid */}
+      <div className="hidden md:flex h-full flex-col overflow-auto">
+        <div className="min-w-[760px]">
+        <div
+          className="grid border-b text-center text-xs font-medium text-muted-foreground"
+          style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}
+        >
+          <div />
+          {days.map((day) => {
+            const dateStr = format(day, "yyyy-MM-dd");
+            return (
+              <div key={dateStr} className={cn("py-2", !isEditable(dateStr) && "text-muted-foreground/60")}>
+                {WEEKDAY_LABELS[day.getDay()]}
+                <div>{format(day, "M/d", { locale: ja })}</div>
+              </div>
+            );
+          })}
         </div>
 
-        {days.map((day) => {
-          const dateStr = format(day, "yyyy-MM-dd");
-          const editable = isEditable(dateStr);
-          return (
-            <div key={dateStr} className="relative flex border-l">
-              {orderedVisible.map((m) => (
-                <div key={m.id} className="relative" style={{ width: `${100 / memberCount}%` }}>
-                  {Array.from({ length: ROWS }, (_, row) => {
-                    const covered = (slotsByUserDate.get(`${m.id}|${dateStr}`) ?? []).some((s) =>
-                      slotCoversRow(s, row * 30, (row + 1) * 30),
-                    );
-                    const isOwn = m.id === currentUserId;
-                    const inPendingDrag =
-                      isOwn &&
-                      dragDate === dateStr &&
-                      dragRows &&
-                      row >= dragRows[0] &&
-                      row <= dragRows[1];
-
-                    return (
-                      <div
-                        key={row}
-                        data-week-date={dateStr}
-                        data-week-row={row}
-                        onPointerDown={() => isOwn && canEdit && handleDown(dateStr, row)}
-                        onPointerEnter={() => isOwn && canEdit && handleEnter(dateStr, row)}
-                        className={cn(
-                          "h-11 border-b border-r border-dashed border-muted-foreground/10 touch-none",
-                          row % 4 === 0 && "border-t border-solid border-muted-foreground/20",
-                          isOwn && editable && "cursor-pointer",
-                          !editable && isOwn && "bg-muted/40",
-                        )}
-                        style={{
-                          backgroundColor: covered ? `${m.color}` + (isOwn ? "cc" : "66") : undefined,
-                          outline: inPendingDrag ? `2px solid ${m.color}` : undefined,
-                          outlineOffset: -2,
-                        }}
-                      />
-                    );
-                  })}
-                </div>
-              ))}
-            </div>
-          );
-        })}
-      </div>
+        <div className="grid flex-1" style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}>
+          {timeLabels}
+          {days.map((day) => renderDayColumn(day))}
+        </div>
+        </div>
       </div>
     </div>
   );
