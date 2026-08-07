@@ -16,7 +16,7 @@ import { Input } from "@/components/ui/input";
 const durations = [30, 60, 90, 120] as const;
 const times = Array.from({ length: 48 }, (_, i) => i * 30);
 
-export function PlanningBoard({ currentUser, members, initialSlots = [], preview = false }: { currentUser: Profile; members: Profile[]; initialSlots?: Slot[]; preview?: boolean }) {
+export function PlanningBoard({ currentUser, members, initialSlots = [], preview = false, onEventCreated }: { currentUser: Profile; members: Profile[]; initialSlots?: Slot[]; preview?: boolean; onEventCreated?: (event: { id: string }) => void }) {
   const [week, setWeek] = useState(() => startOfWeek(new Date(`${jstToday()}T12:00:00`), { weekStartsOn: 1 }));
   const [selectedIds, setSelectedIds] = useState(() => new Set([currentUser.id]));
   const [slots, setSlots] = useState<Slot[]>(initialSlots);
@@ -30,7 +30,8 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
   const dates = useMemo(() => days.map((day) => format(day, "yyyy-MM-dd")), [days]);
 
   const fetchSlots = useCallback(async () => {
-    if (preview || selectedIds.size === 0) { setSlots([]); return; }
+    if (preview) return;
+    if (selectedIds.size === 0) { setSlots([]); return; }
     const generation = ++request.current;
     setLoading(true);
     const { data, error } = await createClient().from("availability_slots").select("*")
@@ -77,7 +78,8 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
     const end = new Date(start.getTime() + duration * 60_000);
     const payload = { title: title.trim(), description: null, start_at: start.toISOString(), end_at: end.toISOString(), created_by: currentUser.id, status: "published" as const };
     if (preview) {
-      addDevEvent(payload);
+      const created = addDevEvent(payload);
+      onEventCreated?.(created);
       const local = JSON.parse(window.localStorage.getItem("eventcalendar-dev-events") ?? "[]") as unknown[];
       window.localStorage.setItem("eventcalendar-dev-events", JSON.stringify([...local, { ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }]));
       toast.success("イベントを作成しました（ローカル）。"); router.push("/events"); return;
@@ -85,6 +87,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
     const { error } = await createClient().from("events").insert(payload);
     if (error) { toast.error("イベントの作成に失敗しました。"); return; }
     toast.success("イベントを作成しました。");
+    onEventCreated?.({ id: "created" });
     router.push("/events");
   }
 
