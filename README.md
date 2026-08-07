@@ -9,7 +9,7 @@ Next.js 16（App Router）+ Supabase。イベント、空き時間登録、企�
 
 ## 2. DBスキーマを適用する
 
-`supabase/migrations/` の `0001` から `0006` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
+`supabase/migrations/` の `0001` から `0007` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
 
 ```bash
 npx supabase login
@@ -17,7 +17,7 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。
+SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。`0007_super_user_delete_event.sql` は、キャンセル済みイベントをsuper userが完全削除するRPCを追加します。
 
 ## 3. ローカル開発・fixture
 
@@ -124,3 +124,9 @@ npx wrangler rollback <previous-version-id>
 - `npm run preview:worker` — Worker preview
 - `npm run deploy:worker` — Cloudflare Workersへデプロイ
 - `npm test` / `npm run lint` — 認証・品質確認
+
+## 6. イベント削除と既知の制約
+
+イベント作成者はイベントをキャンセルできます。キャンセルは履歴を残す論理削除です。`0007_super_user_delete_event.sql` 適用後は、super userだけが詳細画面の「完全に削除」からキャンセル済みイベントを物理削除できます。未キャンセルのイベントや一般ユーザーの削除はDB側で拒否されます。
+
+スマホの月表示では、同じ日に複数イベントがある場合、件数バッジは表示されますが、現状その月セルから個別のイベント詳細を開けません。週表示に切り替えると、各イベントをタップして詳細を確認できます。この月表示の詳細導線は次のUI修正対象です。

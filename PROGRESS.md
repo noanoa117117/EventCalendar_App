@@ -11,6 +11,7 @@
 | アプリ機能（Phase 1-6） | 実装済み | 画面①イベント、②空き時間、③企画、管理画面まで実装済み。実Supabase上の総合E2Eは未完了。 |
 | 空き時間の保存 | 実装済み・要DB適用確認 | UIは `set_availability_batch` を呼ぶ。実Supabaseに `0006_batch_availability.sql` が適用済みかを最優先で確認する。 |
 | 管理画面 | 実装済み・要DB適用確認 | UI/RPCは `0005_admin_access_controls.sql` と `0006` を前提にする。実環境では少なくとも `0001`〜`0004` 適用済み。`0005`/`0006` の適用状況は未記録なので、推測で扱わない。 |
+| イベント完全削除 | 実装済み・要DB適用確認 | `0007_super_user_delete_event.sql` 適用後、super userがキャンセル済みイベントを物理削除できる。未キャンセルイベントと一般ユーザーはDB側で拒否する。 |
 | ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
 | Cloudflare Access 認証 | 実装済み・本番未検証 | JWT検証→Supabase allowlist→SSRセッション発行。13テストは成功済み。未許可メールには管理者登録依頼とGoogle再ログインの案内を返す。Cloudflare Dashboard/本番Secretは未設定。 |
 | Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solutions.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
@@ -74,6 +75,7 @@
   - 初期super userは `sinigamiyuuna@gmail.com`
   - 管理者は一般メンバーの許可メールを管理し、super userは権限変更も可能
   - 最後の有効super userはDB側で保護
+- [x] Phase 6追加: super userによるキャンセル済みイベントの完全削除（`0007_super_user_delete_event.sql`）
 
 ## ユーザー側で必要な作業（実環境を変更するもの）
 
@@ -84,7 +86,8 @@
 - [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 - [x] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
 - [x] 実ブラウザで①→②→③の画面遷移、モバイルでの各画面の操作性、および空き時間更新後の企画候補再集計を確認
-- [] `/admin` で許可メール管理・ロール変更を確認
+- [ ] `0007_super_user_delete_event.sql` の実Supabase適用状況を確認
+- [ ] `/admin` で許可メール管理・ロール変更を確認
 
 ## 次のフェーズ（未着手）
 
@@ -117,6 +120,8 @@
 
 - **イベント月表示のモバイル対応**: 7列の月表示ではタイトルを無理に縮めず、確定イベントは色付きドット（4件以上は`+N`）で表示する。タップすると詳細ボトムシートでタイトル・日時・主催者・参加操作を確認できる。週表示では時刻＋タイトルの縦リストを使う。
 - **Cloudflare未許可メールの案内**: `/auth/cloudflare` は403を維持し、allowlist外のGoogleアカウントには管理者への登録依頼と再ログインを促す日本語メッセージを表示する。allowlist照合前の副作用はない。
+- **イベント完全削除**: `0007_super_user_delete_event.sql` とUIを追加。キャンセル済みイベントだけをsuper userが物理削除できる。未キャンセルイベントや一般ユーザーの削除は拒否する。
+- **既知のモバイル問題**: 月表示で同日に複数イベントがある場合、件数バッジは表示されるが個別詳細を開けない。週表示では確認可能で、月表示の詳細導線を次の修正対象とする。
 
 ### ローカルSupabase fixture（コミット済み）
 
