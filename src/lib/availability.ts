@@ -56,6 +56,70 @@ export interface TimeRange {
   end_time: string;
 }
 
+export interface AvailabilityOperation {
+  dates: string[];
+  start: string;
+  end: string;
+  active: boolean;
+  presetId: string | null;
+}
+
+/** Apply staged operations in order, preserving other members' rows. */
+export function applyAvailabilityOperations(
+  serverSlots: Array<TimeRange & Pick<import("./types").Slot, "id" | "user_id" | "date" | "preset_id">>,
+  operations: AvailabilityOperation[],
+  currentUserId: string,
+): import("./types").Slot[] {
+  const rows = serverSlots.map((s) => ({ ...s }));
+  let sequence = 0;
+  for (const op of operations) {
+    for (const date of op.dates) {
+      const own = rows.filter((s) => s.user_id === currentUserId && s.date === date);
+      rows.splice(0, rows.length, ...rows.filter((s) => !(s.user_id === currentUserId && s.date === date)));
+      const start = startMinutes(op.start);
+      const end = endMinutes(op.end);
+      if (op.active) {
+        let mergedStart = start;
+        let mergedEnd = end;
+        let merged = false;
+        const untouched = [] as typeof own;
+        for (const row of own) {
+          const rs = startMinutes(row.start_time);
+          const re = endMinutes(row.end_time);
+          if (rs <= mergedEnd && re >= mergedStart) {
+            mergedStart = Math.min(mergedStart, rs);
+            mergedEnd = Math.max(mergedEnd, re);
+            merged = true;
+          } else {
+            untouched.push(row);
+          }
+        }
+        rows.push(...untouched);
+        rows.push({
+          id: merged ? `draft-${sequence++}` : `draft-${sequence++}`,
+          user_id: currentUserId,
+          date,
+          start_time: minutesToTime(mergedStart),
+          end_time: minutesToTime(mergedEnd),
+          preset_id: merged ? null : op.presetId,
+        });
+      } else {
+        for (const row of own) {
+          const rs = startMinutes(row.start_time);
+          const re = endMinutes(row.end_time);
+          if (re <= start || rs >= end) {
+            rows.push(row);
+            continue;
+          }
+          if (rs < start) rows.push({ ...row, id: `draft-${sequence++}`, end_time: minutesToTime(start) });
+          if (re > end) rows.push({ ...row, id: `draft-${sequence++}`, start_time: minutesToTime(end) });
+        }
+      }
+    }
+  }
+  return rows.sort((a, b) => a.date.localeCompare(b.date) || startMinutes(a.start_time) - startMinutes(b.start_time) || a.user_id.localeCompare(b.user_id));
+}
+
 // Minutes since midnight. '00:00:00' as an *end* time is a sentinel for
 // "end of day" (24:00) - see supabase/migrations/0001_init.sql. Never
 // pass a start time into this treating it as an end.

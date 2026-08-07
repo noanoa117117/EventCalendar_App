@@ -154,6 +154,16 @@ export interface Database {
         };
         Returns: void;
       };
+      set_availability_batch: {
+        Args: { p_operations: Array<{
+          dates: string[];
+          start: string;
+          end: string;
+          active: boolean;
+          presetId: string | null;
+        }> };
+        Returns: void;
+      };
       current_user_role: { Args: Record<string, never>; Returns: AllowedEmailRole | null };
       is_admin: { Args: Record<string, never>; Returns: boolean };
       is_super_user: { Args: Record<string, never>; Returns: boolean };
@@ -161,9 +171,14 @@ export interface Database {
         Args: Record<string, never>;
         Returns: Database["public"]["Tables"]["allowed_emails"]["Row"][];
       };
-      set_member_access: { Args: { p_email: string; p_enabled: boolean }; Returns: void };
-      delete_member: { Args: { p_email: string }; Returns: void };
-      set_allowed_email_role: { Args: { p_email: string; p_role: AllowedEmailRole }; Returns: void };
+      manage_allowed_email: {
+        Args: { p_email: string; p_role?: AllowedEmailRole; p_enabled?: boolean };
+        Returns: Database["public"]["Tables"]["allowed_emails"]["Row"];
+      };
+      delete_allowed_email: {
+        Args: { p_email: string };
+        Returns: Database["public"]["Tables"]["allowed_emails"]["Row"];
+      };
     };
     Enums: Record<string, never>;
   };

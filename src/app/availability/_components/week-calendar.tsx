@@ -27,6 +27,7 @@ export function WeekCalendar({
   slots,
   window: editableWindow,
   onDragCommit,
+  canEdit,
 }: {
   cursorDate: Date;
   members: Profile[];
@@ -35,6 +36,7 @@ export function WeekCalendar({
   slots: Slot[];
   window: { min: string; max: string };
   onDragCommit: (date: string, start: string, end: string, action: "apply" | "remove") => void;
+  canEdit: boolean;
 }) {
   const { start: weekStart } = weekRange(cursorDate);
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
@@ -75,7 +77,7 @@ export function WeekCalendar({
   }
 
   function handleDown(dateStr: string, row: number) {
-    if (!isEditable(dateStr)) return;
+    if (!canEdit || !isEditable(dateStr)) return;
     draggingRef.current = true;
     dragDateRef.current = dateStr;
     dragActionRef.current = isOwnRowCovered(dateStr, row) ? "remove" : "apply";
@@ -85,7 +87,7 @@ export function WeekCalendar({
   }
 
   function handleEnter(dateStr: string, row: number) {
-    if (!draggingRef.current || dateStr !== dragDateRef.current) return;
+    if (!canEdit || !draggingRef.current || dateStr !== dragDateRef.current) return;
     const next: [number, number] = dragRowsRef.current ? [Math.min(dragRowsRef.current[0], row), Math.max(dragRowsRef.current[1], row)] : [row, row];
     dragRowsRef.current = next;
     setDragRows(next);
@@ -187,8 +189,8 @@ export function WeekCalendar({
                         key={row}
                         data-week-date={dateStr}
                         data-week-row={row}
-                        onPointerDown={() => isOwn && handleDown(dateStr, row)}
-                        onPointerEnter={() => isOwn && handleEnter(dateStr, row)}
+                        onPointerDown={() => isOwn && canEdit && handleDown(dateStr, row)}
+                        onPointerEnter={() => isOwn && canEdit && handleEnter(dateStr, row)}
                         className={cn(
                           "h-11 border-b border-r border-dashed border-muted-foreground/10 touch-none",
                           row % 4 === 0 && "border-t border-solid border-muted-foreground/20",
@@ -196,11 +198,9 @@ export function WeekCalendar({
                           !editable && isOwn && "bg-muted/40",
                         )}
                         style={{
-                          backgroundColor: inPendingDrag
-                            ? `${m.color}88`
-                            : covered
-                              ? `${m.color}` + (isOwn ? "cc" : "66")
-                              : undefined,
+                          backgroundColor: covered ? `${m.color}` + (isOwn ? "cc" : "66") : undefined,
+                          outline: inPendingDrag ? `2px solid ${m.color}` : undefined,
+                          outlineOffset: -2,
                         }}
                       />
                     );

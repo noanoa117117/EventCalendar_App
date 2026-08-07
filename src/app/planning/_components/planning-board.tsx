@@ -2,19 +2,25 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { addDays, format, startOfWeek } from "date-fns";
+import { addDays, format, isToday, startOfWeek } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import Link from "next/link";
+import { CalendarPlus, ChevronLeft, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { addDevEvent } from "@/lib/dev-auth";
 import { expandToSlots, jstToday, minutesToTime, type TimeRange } from "@/lib/availability";
 import type { Profile, Slot } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const durations = [30, 60, 90, 120] as const;
-const times = Array.from({ length: 48 }, (_, i) => i * 30);
+
+interface Window {
+  start: number;
+  end: number;
+}
 
 export function PlanningBoard({ currentUser, members, initialSlots = [], preview = false, onEventCreated }: { currentUser: Profile; members: Profile[]; initialSlots?: Slot[]; preview?: boolean; onEventCreated?: (event: { id: string }) => void }) {
   const [week, setWeek] = useState(() => startOfWeek(new Date(`${jstToday()}T12:00:00`), { weekStartsOn: 1 }));
@@ -42,7 +48,6 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
     setSlots(data ?? []);
   }, [dates, preview, selectedIds]);
 
-  // This effect synchronizes the board with the external Supabase query.
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchSlots(); }, [fetchSlots]);
 
@@ -60,20 +65,57 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
     return byDate;
   }, [dates, selectedIds, slots]);
 
-  function countAvailable(date: string, minute: number) {
-    const cell = minutesToTime(minute);
-    return Array.from(availability.get(date)?.values() ?? []).filter((set) => set.has(cell)).length;
+  const commonWindows = useMemo(() => {
+    if (selectedIds.size === 0) return dates.map((date) => ({ date, windows: [] as Window[] }));
+    return dates.map((date) => {
+      const windows: Window[] = [];
+      let windowStart: number | null = null;
+      for (let minute = 0; minute < 1440; minute += 30) {
+        const cell = minutesToTime(minute);
+        const allFree = Array.from(availability.get(date)?.values() ?? []).every((set) => set.has(cell));
+        if (allFree) {
+          if (windowStart === null) windowStart = minute;
+        } else {
+          if (windowStart !== null) {
+            windows.push({ start: windowStart, end: minute });
+            windowStart = null;
+          }
+        }
+      }
+      if (windowStart !== null) windows.push({ start: windowStart, end: 1440 });
+      return { date, windows };
+    });
+  }, [dates, selectedIds, availability]);
+
+  function canUse(date: string, start: number, len: number) {
+    const entry = commonWindows.find((w) => w.date === date);
+    if (!entry) return false;
+    return entry.windows.some((w) => start >= w.start && start + len <= w.end);
   }
-  function canUse(date: string, minute: number, length: number) {
-    if (minute + length > 1440 || selectedIds.size === 0) return false;
-    for (let offset = 0; offset < length; offset += 30) if (countAvailable(date, minute + offset) !== selectedIds.size) return false;
-    return true;
+
+  function pickWindow(date: string, win: Window) {
+    const bestDuration = durations.find((d) => d <= win.end - win.start) ?? 30;
+    setPicked({ date, start: win.start });
+    setDuration(bestDuration <= win.end - win.start ? bestDuration : 30);
   }
-  const selectedDate = picked?.date ?? dates[0];
-  const selectedStart = picked?.start ?? 9 * 60;
+
+  function startsInWindow(date: string, win: Window): string[] {
+    const result: string[] = [];
+    for (let m = win.start; m + 30 <= win.end; m += 30) {
+      result.push(minutesToTime(m));
+    }
+    return result;
+  }
+
+  const pickedWindow = picked
+    ? commonWindows.find((d) => d.date === picked.date)?.windows.find((w) => picked.start >= w.start && picked.start < w.end) ?? null
+    : null;
 
   async function createEvent() {
-    if (!picked || !title.trim() || !canUse(picked.date, picked.start, duration)) { toast.error("共通の空き時間とタイトルを選択してください。"); return; }
+    if (!picked || !title.trim() || !canUse(picked.date, picked.start, duration)) {
+      toast.error("共通の空き時間とタイトルを選択してください。");
+      return;
+    }
     const start = new Date(`${picked.date}T${minutesToTime(picked.start)}:00+09:00`);
     const end = new Date(start.getTime() + duration * 60_000);
     const payload = { title: title.trim(), description: null, start_at: start.toISOString(), end_at: end.toISOString(), created_by: currentUser.id, status: "published" as const };
@@ -82,7 +124,9 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
       onEventCreated?.(created);
       const local = JSON.parse(window.localStorage.getItem("eventcalendar-dev-events") ?? "[]") as unknown[];
       window.localStorage.setItem("eventcalendar-dev-events", JSON.stringify([...local, { ...payload, id: crypto.randomUUID(), created_at: new Date().toISOString() }]));
-      toast.success("イベントを作成しました（ローカル）。"); router.push("/events"); return;
+      toast.success("イベントを作成しました（ローカル）。");
+      router.push("/events");
+      return;
     }
     const { error } = await createClient().from("events").insert(payload);
     if (error) { toast.error("イベントの作成に失敗しました。"); return; }
@@ -91,13 +135,210 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
     router.push("/events");
   }
 
-  return <main className="min-h-dvh bg-muted/20"><header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 md:px-8"><div><h1 className="text-lg font-semibold">メンバーの共通空き時間でイベント企画</h1><p className="text-xs text-muted-foreground">選択したメンバー全員の空き時間が重なる日時を計算して、イベントを作成できます（JST）。</p></div><div className="flex gap-3"><Link href="/events" className="text-sm underline-offset-4 hover:underline">イベントカレンダー</Link><Link href="/availability" className="text-sm underline-offset-4 hover:underline">空き時間を登録・確認</Link></div></header>
-    <div className="mx-auto grid max-w-7xl gap-4 p-4 md:grid-cols-[200px_1fr_280px] md:p-8">
-      <aside className="rounded-xl border bg-background p-4"><h2 className="mb-3 font-medium">メンバー</h2><div className="space-y-2">{members.map((member) => <label key={member.id} className="flex items-center gap-2 text-sm"><input type="checkbox" checked={selectedIds.has(member.id)} onChange={() => setSelectedIds((old) => { const next = new Set(old); if (next.has(member.id)) next.delete(member.id); else next.add(member.id); return next; })} /><span className="size-2 rounded-full" style={{ backgroundColor: member.color }} />{member.nickname}</label>)}</div></aside>
-      <div className="relative grid gap-4 md:col-span-2 md:grid-cols-[minmax(0,1fr)_280px]">
-      <section className="overflow-auto rounded-xl border bg-background p-3"><div className="mb-3 flex items-center justify-between"><Button size="sm" variant="outline" disabled={loading} onClick={() => setWeek((d) => addDays(d, -7))}>前週</Button><h2 className="font-medium">{format(days[0], "M月d日", { locale: ja })} - {format(days[6], "M月d日", { locale: ja })}</h2><Button size="sm" variant="outline" disabled={loading} onClick={() => setWeek((d) => addDays(d, 7))}>次週</Button></div><p className="mb-2 text-xs text-muted-foreground">セルは30分単位です。人数は選択メンバー中の空き人数。</p><div className="min-w-[620px]"><div className="grid grid-cols-[56px_repeat(7,minmax(70px,1fr))]"> <div />{days.map((day, i) => <div key={dates[i]} className="border-b p-1 text-center text-xs font-medium">{format(day, "EEE", { locale: ja })}<br />{format(day, "M/d")}</div>)}{times.map((minute) => <div key={minute} className="contents"><div className="border-r px-1 py-1 text-right text-[10px] text-muted-foreground">{minute % 60 === 0 ? minutesToTime(minute) : ""}</div>{dates.map((date) => { const count = countAvailable(date, minute); const common = count === selectedIds.size && selectedIds.size > 0; const active = picked?.date === date && picked.start === minute; return <button key={`${date}-${minute}`} type="button" disabled={!common} onClick={() => { setPicked({ date, start: minute }); setDuration(durations.find((d) => canUse(date, minute, d)) ?? 30); }} className={`h-7 border-b border-r text-[10px] ${active ? "bg-primary text-primary-foreground" : common ? "bg-emerald-100 hover:bg-emerald-200 dark:bg-emerald-900/40" : "bg-muted/30 text-muted-foreground"}`} aria-label={`${date} ${minutesToTime(minute)} ${count}/${selectedIds.size}人`}>{count}/{selectedIds.size}</button>; })}</div>)}</div></div></section>
-      <aside className="rounded-xl border bg-background p-4"><h2 className="mb-3 font-medium">イベント作成</h2><div className="space-y-3"><label className="block text-sm">タイトル<Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：定例ミーティング" /></label><p className="text-sm">日時：{selectedDate} {minutesToTime(selectedStart)}（JST）</p><fieldset><legend className="mb-1 text-sm">時間</legend><div className="grid grid-cols-4 gap-1">{durations.map((d) => <Button key={d} type="button" size="sm" variant={duration === d ? "default" : "outline"} disabled={!picked || !canUse(selectedDate, selectedStart, d)} onClick={() => setDuration(d)}>{d}分</Button>)}</div></fieldset><p className="text-xs text-muted-foreground">イベント作成者はあなたのみです。選択メンバーは自動参加登録されません。</p><Button className="w-full" disabled={loading || !picked || !title.trim() || !canUse(selectedDate, selectedStart, duration)} onClick={createEvent}>イベントを作成</Button></div></aside>
-      {loading && <div className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-background/70 backdrop-blur-[1px]" role="status" aria-live="polite" aria-label="空き時間を読み込み中"><div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm"><span className="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" aria-hidden="true" />空き時間を読み込み中…</div></div>}
+  function toggleMember(id: string) {
+    setSelectedIds((old) => {
+      const next = new Set(old);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  const totalWindows = commonWindows.reduce((sum, d) => sum + d.windows.length, 0);
+
+  return (
+    <main className="min-h-dvh bg-muted/20">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 shadow-sm md:px-8">
+        <div>
+          <h1 className="text-lg font-semibold">イベント企画</h1>
+          <p className="text-xs text-muted-foreground">全員の空き時間から候補を表示</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Link href="/events" className="text-sm text-muted-foreground underline-offset-4 hover:underline">カレンダー</Link>
+          <Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き時間</Link>
+        </div>
+      </header>
+
+      <div className="mx-auto max-w-3xl p-4 md:p-6">
+        {/* Member selection */}
+        <div className="mb-4 rounded-xl border bg-background p-3 shadow-sm">
+          <h2 className="mb-2 text-xs font-semibold text-muted-foreground">メンバーを選択</h2>
+          <div className="flex flex-wrap gap-x-4 gap-y-1.5">
+            {members.map((member) => (
+              <label key={member.id} className="flex items-center gap-2 text-sm">
+                <Checkbox checked={selectedIds.has(member.id)} onCheckedChange={() => toggleMember(member.id)} />
+                <span className="size-2 rounded-full" style={{ backgroundColor: member.color }} />
+                <span>{member.nickname}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Week navigation */}
+        <div className="mb-4 flex items-center justify-between">
+          <Button size="icon" variant="ghost" disabled={loading} onClick={() => setWeek((d) => addDays(d, -7))} aria-label="前週">
+            <ChevronLeft className="size-4" />
+          </Button>
+          <h2 className="text-sm font-semibold">
+            {format(days[0], "M/d（EEE）", { locale: ja })} – {format(days[6], "M/d（EEE）", { locale: ja })}
+          </h2>
+          <Button size="icon" variant="ghost" disabled={loading} onClick={() => setWeek((d) => addDays(d, 7))} aria-label="次週">
+            <ChevronRight className="size-4" />
+          </Button>
+        </div>
+
+        {loading && (
+          <div className="mb-4 flex items-center justify-center gap-2 rounded-lg border bg-background p-4 text-sm shadow-sm">
+            <span className="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" aria-hidden="true" />
+            読み込み中…
+          </div>
+        )}
+
+        {!loading && selectedIds.size === 0 && (
+          <div className="rounded-xl border border-dashed bg-background p-8 text-center text-sm text-muted-foreground shadow-sm">
+            メンバーを選択してください
+          </div>
+        )}
+
+        {!loading && selectedIds.size > 0 && (
+          <div className="grid gap-3 md:grid-cols-[1fr_280px] md:items-start md:gap-4">
+            {/* Availability slots list */}
+            <div className="space-y-2">
+              {totalWindows === 0 && (
+                <div className="rounded-xl border border-dashed bg-background p-6 text-center text-sm text-muted-foreground shadow-sm">
+                  この週に全員が空いている時間帯はありません
+                </div>
+              )}
+              {commonWindows.map(({ date, windows: wins }) => {
+                const day = new Date(`${date}T12:00:00`);
+                const today = isToday(day);
+                if (wins.length === 0 && totalWindows > 0) return null;
+                return (
+                  <div key={date} className="rounded-xl border bg-background shadow-sm">
+                    <div className={`flex items-baseline gap-2 border-b px-3 py-2 ${today ? "bg-primary/5" : ""}`}>
+                      <span className="text-sm font-semibold">{format(day, "M/d", { locale: ja })}</span>
+                      <span className="text-xs text-muted-foreground">{format(day, "EEEE", { locale: ja })}</span>
+                      {today && <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">今日</span>}
+                      <span className="ml-auto text-xs text-muted-foreground">
+                        {wins.length > 0 ? `${wins.length}件の候補` : "空きなし"}
+                      </span>
+                    </div>
+                    {wins.length > 0 && (
+                      <div className="divide-y">
+                        {wins.map((win) => {
+                          const isSelected = picked?.date === date && picked.start >= win.start && picked.start < win.end;
+                          const durationMin = win.end - win.start;
+                          const hours = Math.floor(durationMin / 60);
+                          const mins = durationMin % 60;
+                          const durationLabel = hours > 0 && mins > 0 ? `${hours}時間${mins}分` : hours > 0 ? `${hours}時間` : `${mins}分`;
+                          return (
+                            <button
+                              key={`${date}-${win.start}`}
+                              type="button"
+                              onClick={() => pickWindow(date, win)}
+                              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors ${
+                                isSelected ? "bg-primary/8" : "hover:bg-accent/50"
+                              }`}
+                            >
+                              <div className="flex min-w-0 flex-1 items-center gap-2">
+                                <span className={`size-2 shrink-0 rounded-full ${isSelected ? "bg-primary" : "bg-emerald-500"}`} />
+                                <span className="text-sm font-medium">
+                                  {minutesToTime(win.start)}–{minutesToTime(win.end)}
+                                </span>
+                                <span className="text-xs text-muted-foreground">{durationLabel}</span>
+                              </div>
+                              {isSelected && <span className="shrink-0 text-xs font-medium text-primary">選択中</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Event creation panel */}
+            <div className="rounded-xl border bg-background p-4 shadow-sm md:sticky md:top-4">
+              <div className="mb-4 flex items-center gap-2">
+                <CalendarPlus className="size-4 text-primary" />
+                <h2 className="font-semibold">イベント作成</h2>
+              </div>
+
+              <div className="space-y-4">
+                <label className="block space-y-1 text-sm">
+                  <span className="font-medium">タイトル</span>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="例：定例ミーティング" />
+                </label>
+
+                {picked && pickedWindow ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg border bg-accent/30 p-3">
+                      <p className="text-xs font-medium text-muted-foreground">選択中</p>
+                      <p className="mt-0.5 font-semibold">
+                        {picked.date} {minutesToTime(picked.start)}–{minutesToTime(picked.start + duration)}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="mb-1.5 block text-sm font-medium">開始時刻</label>
+                      <select
+                        value={minutesToTime(picked.start)}
+                        onChange={(e) => {
+                          const [h, m] = e.target.value.split(":").map(Number);
+                          setPicked({ date: picked.date, start: h * 60 + m });
+                        }}
+                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                      >
+                        {startsInWindow(picked.date, pickedWindow).map((t) => (
+                          <option key={t} value={t}>{t}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <fieldset>
+                      <legend className="mb-1.5 text-sm font-medium">時間</legend>
+                      <div className="grid grid-cols-4 gap-1.5">
+                        {durations.map((d) => (
+                          <Button
+                            key={d}
+                            type="button"
+                            size="sm"
+                            variant={duration === d ? "default" : "outline"}
+                            disabled={!canUse(picked.date, picked.start, d)}
+                            onClick={() => setDuration(d)}
+                          >
+                            {d}分
+                          </Button>
+                        ))}
+                      </div>
+                    </fieldset>
+                  </div>
+                ) : (
+                  <div className="rounded-lg border border-dashed p-4 text-center">
+                    <p className="text-sm text-muted-foreground">
+                      {totalWindows > 0 ? "候補をタップして選択" : "候補がありません"}
+                    </p>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  選択メンバーは自動参加登録されません。
+                </p>
+
+                <Button
+                  className="w-full"
+                  disabled={loading || !picked || !title.trim() || !canUse(picked.date, picked.start, duration)}
+                  onClick={createEvent}
+                >
+                  <CalendarPlus className="mr-1.5 size-4" />
+                  イベントを作成
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
-    </div></main>;
+    </main>
+  );
 }
