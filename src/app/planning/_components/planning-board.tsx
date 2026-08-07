@@ -128,10 +128,15 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
       router.push("/events");
       return;
     }
-    const { error } = await createClient().from("events").insert(payload);
-    if (error) { toast.error("イベントの作成に失敗しました。"); return; }
+    const { data, error } = await createClient().from("events").insert(payload).select().single();
+    if (error || !data) { toast.error("イベントの作成に失敗しました。"); return; }
     toast.success("イベントを作成しました。");
-    onEventCreated?.({ id: "created" });
+    fetch("/api/events/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ eventId: data.id }),
+    }).catch(() => {});
+    onEventCreated?.(data);
     router.push("/events");
   }
 
@@ -267,7 +272,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
                     <div className="rounded-lg border bg-accent/30 p-3">
                       <p className="text-xs font-medium text-muted-foreground">選択中</p>
                       <p className="mt-0.5 font-semibold">
-                        {picked.date} {minutesToTime(picked.start)}–{minutesToTime(picked.start + duration)}
+                        {format(new Date(`${picked.date}T12:00:00`), "M/d（EEE）", { locale: ja })} {minutesToTime(picked.start)}–{minutesToTime(picked.start + duration)}
                       </p>
                     </div>
 
