@@ -23,13 +23,8 @@ function safeNextPath(value: string | null, origin: string) {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const code = url.searchParams.get("code");
   const next = safeNextPath(url.searchParams.get("next"), url.origin);
   const supabase = await createClient();
-
-  if (code) {
-    await supabase.auth.exchangeCodeForSession(code);
-  }
 
   const {
     data: { user },

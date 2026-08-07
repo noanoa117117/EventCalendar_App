@@ -12,13 +12,11 @@ export function SignOutButton({
 }) {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-
   async function handleSignOut() {
     setLoading(true);
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.replace("/login");
-    router.refresh();
+    router.push("/auth/cloudflare/logout");
   }
 
   return (

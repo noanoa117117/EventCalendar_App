@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 
 export function LoginButton({ next, local }: { next?: string; local: boolean }) {
   const [loading, setLoading] = useState(false);
@@ -14,22 +14,6 @@ export function LoginButton({ next, local }: { next?: string; local: boolean }) 
     const redirectTo = new URL("/auth/callback", window.location.origin);
     if (next) redirectTo.searchParams.set("next", next);
     return redirectTo;
-  }
-
-  async function handleLogin() {
-    setLoading(true);
-    setError(null);
-    const supabase = createClient();
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: callbackUrl().toString() },
-    });
-
-    if (error) {
-      setError(error.message);
-      setLoading(false);
-    }
   }
 
   async function handlePasswordLogin(event: React.FormEvent<HTMLFormElement>) {
@@ -45,18 +29,15 @@ export function LoginButton({ next, local }: { next?: string; local: boolean }) 
       return;
     }
 
-    // Keep local password login on the same callback/next path as OAuth.
+    // Keep local password login on the same callback/next path.
     window.location.assign(callbackUrl().toString());
   }
 
   return (
     <div className="space-y-3">
-      <Button onClick={handleLogin} disabled={loading} className="w-full">
-        {loading ? "接続中..." : "Googleでログイン"}
-      </Button>
+      {!local && <a className={`${buttonVariants()} w-full`} href={`/auth/cloudflare${next ? `?next=${encodeURIComponent(next)}` : ""}`}>Cloudflare Accessでログイン</a>}
       {local && (
         <>
-          <div className="text-muted-foreground text-xs">またはローカル fixture</div>
           <form onSubmit={handlePasswordLogin} className="space-y-2 text-left">
             <label htmlFor="login-email" className="sr-only">メールアドレス</label>
             <input

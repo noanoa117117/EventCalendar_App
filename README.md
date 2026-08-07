@@ -31,13 +31,28 @@ npx supabase db push
 
 メンバーの追加・有効化・削除は、ログイン後に管理者へ表示される「管理」画面から行えます。管理者は一般メンバーを管理でき、super userは管理者／super userのロール変更もできます。
 
-## 3. Google OAuthを設定する
+## 3. Cloudflare Accessを設定する（リモート環境）
 
-1. Supabaseダッシュボード `Authentication > Providers > Google` を開き、有効化する。
-2. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) でOAuthクライアントIDを作成する（種類: ウェブアプリケーション）。
-3. 承認済みのリダイレクトURIに、Supabaseの `Authentication > Providers > Google` 画面に表示される callback URL
-   （`https://<project-ref>.supabase.co/auth/v1/callback`）を追加する。
-4. 発行されたClient IDとClient SecretをSupabaseのGoogle Provider設定に貼り付けて保存する。
+Cloudflare Accessでアプリを保護し、以下をサーバー環境変数に設定します。
+
+```env
+AUTH_MODE=cloudflare
+CF_ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com
+CF_ACCESS_AUD=<application audience tag>
+SUPABASE_SERVICE_ROLE_KEY=<Supabase service_role key>
+```
+
+`/auth/cloudflare` は `Cf-Access-Jwt-Assertion` をJWKS、issuer、audienceで検証し、`allowed_emails.is_enabled` をサービスロールで照合してSupabase SSRセッションを発行します。サービスキーは `NEXT_PUBLIC_*` にせず、クライアントへ返さないでください。SupabaseのData APIを直接公開する構成ではCloudflareゲートウェイ外の通信を防げないため、必要に応じてSupabaseを非公開ネットワークに置くかBFF化してください。
+
+### Access Policy（メールをCloudflare側で管理しない設定）
+
+- Action: `Allow`
+- Include: `Everyone`
+- Require: `Login Methods` → `Google`
+- Application identity providers: `Google` のみ
+- Apply instant authentication: 有効
+
+`Include` に `Everyone` と `Login Methods` を並べるとOR条件になり、Google以外のログイン方法を将来追加した際に通してしまいます。`Login Methods` は `Require` に置いてください。画面で `Require` が選べない場合は、Application identity providers をGoogleだけに限定し、Google以外のIdP／One-time PIN／Bypass policyを追加しないでください。Cloudflareは本人確認だけを担当し、アプリの利用可否は `public.allowed_emails` の有効な行だけで判定します。
 
 ## 4. 環境変数を設定する
 
@@ -45,9 +60,9 @@ npx supabase db push
 cp .env.local.example .env.local
 ```
 
-`.env.local` を開き、手順1で控えたURLとanon keyを設定する。
+`.env.local` を開き、手順1で控えたURLとanon keyを設定する。ローカルでは `AUTH_MODE=local` のままfixtureメール／パスワードでログインします。リモートは `.env.local.remote` に上記Cloudflare変数も設定し、`npm run env:remote` で有効化します。
 
-Google OAuthなしで画面操作だけを確認したいローカル開発時は、追加で次を設定できる。
+認証なしで画面操作だけを確認したいローカル開発時は、追加で次を設定できる。
 
 ```env
 DEV_BYPASS_AUTH=true
@@ -62,7 +77,7 @@ npm install
 npm run dev
 ```
 
-http://localhost:3000 を開く。ホワイトリストに登録したGoogleアカウントでログインすると、初回はニックネーム設定画面、その後は画面①の共有イベントカレンダー（`/events`）に入ります。画面②の空き時間（`/availability`）と画面③のイベント企画（`/planning`）へは各画面のナビゲーションから移動します。
+http://localhost:3000 を開く。リモートではCloudflare Accessで認証後、許可済みメールアドレスのみ利用できます。
 
 ## スクリプト
 

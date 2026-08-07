@@ -2,11 +2,17 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { isDevPreviewEnabled } from "@/lib/dev-auth";
+import { cloudflareAccessToken, isLocalAuthAllowed, verifyCloudflareAccessToken } from "@/lib/cloudflare-access";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/access-denied"];
+const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/cloudflare", "/access-denied"];
+
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATHS.some((path) => pathname === path || pathname.startsWith(`${path}/`));
+}
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const publicPath = isPublicPath(pathname);
   if (pathname === "/dev-preview" || (isDevPreviewEnabled() && pathname === "/admin")) {
     return NextResponse.next({ request });
   }
@@ -20,6 +26,30 @@ export async function updateSession(request: NextRequest) {
   }
 
   let response = NextResponse.next({ request });
+
+  // In the hosted deployment Cloudflare Access is the authentication
+  // boundary. Reject protected requests before touching application data when
+  // the assertion is absent or invalid.
+  // Local fixture development is the sole opt-out. Any other/missing mode
+  // fails closed rather than allowing an old Supabase session to bypass
+  // Cloudflare Access while production configuration is incomplete.
+  const authMode = process.env.AUTH_MODE;
+  const localMode = authMode === "local";
+  const cloudflareMode = authMode === "cloudflare";
+  if (localMode && !isLocalAuthAllowed()) {
+    return new NextResponse("Invalid local authentication configuration", { status: 500 });
+  }
+  if (!localMode && !cloudflareMode) {
+    return new NextResponse("Authentication configuration required", { status: 500 });
+  }
+  let cloudflareEmail: string | null = null;
+  if (cloudflareMode && !publicPath) {
+    try {
+      cloudflareEmail = (await verifyCloudflareAccessToken(cloudflareAccessToken(request))).email;
+    } catch {
+      return new NextResponse("Cloudflare Access authentication required", { status: 403 });
+    }
+  }
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -46,14 +76,18 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
-
   if (!user) {
-    if (isPublicPath) return response;
+    if (publicPath) return response;
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", pathname);
     return NextResponse.redirect(url);
+  }
+
+  if (cloudflareMode && !publicPath) {
+    if (!user.email || user.email.trim().toLowerCase() !== cloudflareEmail) {
+      return new NextResponse("Cloudflare Access identity mismatch", { status: 403 });
+    }
   }
 
   // Whitelist gate: this RPC evaluates the current JWT in the database
@@ -61,7 +95,7 @@ export async function updateSession(request: NextRequest) {
   const { data: isAllowed } = await supabase.rpc("is_allowed_user");
 
   if (!isAllowed) {
-    if (pathname.startsWith("/access-denied")) return response;
+    if (isPublicPath(pathname) && pathname !== "/access-denied") return response;
     const url = request.nextUrl.clone();
     url.pathname = "/access-denied";
     return NextResponse.redirect(url);
@@ -76,7 +110,7 @@ export async function updateSession(request: NextRequest) {
     }
   }
 
-  if (pathname === "/login" || pathname.startsWith("/access-denied")) {
+  if (pathname === "/login" || pathname === "/access-denied" || pathname.startsWith("/access-denied/")) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     return NextResponse.redirect(url);

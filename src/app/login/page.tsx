@@ -29,8 +29,8 @@ export default async function LoginPage({
           <h1 className="text-2xl font-semibold tracking-tight">空き時間カレンダー</h1>
           <p className="text-muted-foreground text-sm leading-relaxed">
             {local
-              ? "ローカル環境です。fixture のメールアドレスとパスワード、またはGoogleでログインしてください。"
-              : "仲間内限定です。許可されたGoogleアカウントでログインしてください。"}
+              ? "ローカル環境です。fixture のメールアドレスとパスワードでログインしてください。"
+              : "Cloudflare Accessで認証した許可済みメールアドレスのみ利用できます。"}
           </p>
         </div>
         <LoginButton next={next} local={local} />

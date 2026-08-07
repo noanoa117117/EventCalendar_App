@@ -75,7 +75,7 @@ if (target === "local") {
     process.exit(1);
   }
   const local = parseEnv(status);
-  values = { url: local.API_URL, anonKey: local.ANON_KEY };
+  values = { url: local.API_URL, anonKey: local.ANON_KEY, authMode: "local" };
   if (!isExpectedUrl(values.url, "local")) {
     console.error("The local Supabase status did not provide a loopback API URL.");
     process.exit(1);
@@ -86,9 +86,20 @@ if (target === "local") {
     process.exit(1);
   }
   const remote = parseEnv(readFileSync(remoteEnv, "utf8"));
-  values = { url: remote.NEXT_PUBLIC_SUPABASE_URL, anonKey: remote.NEXT_PUBLIC_SUPABASE_ANON_KEY };
+  values = {
+    url: remote.NEXT_PUBLIC_SUPABASE_URL,
+    anonKey: remote.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+    authMode: remote.AUTH_MODE,
+    cfTeamDomain: remote.CF_ACCESS_TEAM_DOMAIN,
+    cfAudience: remote.CF_ACCESS_AUD,
+    serviceRoleKey: remote.SUPABASE_SERVICE_ROLE_KEY,
+  };
   if (remote.DEV_BYPASS_AUTH !== "false") {
     console.error("The remote environment must set DEV_BYPASS_AUTH=false.");
+    process.exit(1);
+  }
+  if (values.authMode !== "cloudflare" || !isSafeValue(values.cfTeamDomain) || !isSafeValue(values.cfAudience) || !isSafeValue(values.serviceRoleKey)) {
+    console.error("The remote environment must configure AUTH_MODE=cloudflare and all Cloudflare/Supabase server credentials.");
     process.exit(1);
   }
   if (!isExpectedUrl(values.url, "remote")) {
@@ -106,6 +117,12 @@ const output = [
   `NEXT_PUBLIC_SUPABASE_URL=${values.url}`,
   `NEXT_PUBLIC_SUPABASE_ANON_KEY=${values.anonKey}`,
   "DEV_BYPASS_AUTH=false",
+  `AUTH_MODE=${values.authMode}`,
+  ...(target === "remote" ? [
+    `CF_ACCESS_TEAM_DOMAIN=${values.cfTeamDomain}`,
+    `CF_ACCESS_AUD=${values.cfAudience}`,
+    `SUPABASE_SERVICE_ROLE_KEY=${values.serviceRoleKey}`,
+  ] : []),
 ].join("\n") + "\n";
 const temporary = `${activeEnv}.tmp-${process.pid}`;
 try {
