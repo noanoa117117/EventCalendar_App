@@ -1,7 +1,7 @@
-# 空き時間カレンダー（Phase 1-5）
+# 空き時間カレンダー（Phase 1-6）
 
 Next.js 16 (App Router) + Supabase。Phase 1（認証・ニックネーム・DBスキーマ）、
-Phase 2（画面②: 個人の空き時間登録）、Phase 3（画面①: 共有イベントカレンダー）、Phase 4（画面③: イベント企画）、Phase 5（統合レイアウト）の実装です。仕様は [REQUIREMENTS.md](./REQUIREMENTS.md)、
+Phase 2（画面②: 個人の空き時間登録）、Phase 3（画面①: 共有イベントカレンダー）、Phase 4（画面③: イベント企画）、Phase 5（統合レイアウト）、Phase 6（管理画面）の実装です。仕様は [REQUIREMENTS.md](./REQUIREMENTS.md)、
 進捗・ネクストステップは [PROGRESS.md](./PROGRESS.md) を参照してください（作業したら更新すること）。
 
 ## 1. Supabaseプロジェクトを作成する
@@ -25,15 +25,11 @@ npx supabase db push
 
 **方法B: ダッシュボードのSQL Editor**
 
-`0001_init.sql`、`0002_secure_profile_and_availability_writes.sql`、`0003_harden_authorization_and_availability.sql` の順に、各ファイルの中身をSQL Editorへ貼り付けて実行する。
+`0001_init.sql`、`0002_secure_profile_and_availability_writes.sql`、`0003_harden_authorization_and_availability.sql`、`0004_admin_roles.sql` の順に、各ファイルの中身をSQL Editorへ貼り付けて実行する。
 
 続けて `supabase/seed.sql` の中身も実行する（自分のメールアドレスをホワイトリストに追加する初期データです。実行前に中のメールアドレスを自分のものに書き換えてください）。
 
-メンバーを追加するときは、SQL Editorで以下を実行します（本人以外は管理者がここで手動追加する運用です — §4/§9参照）。
-
-```sql
-insert into public.allowed_emails (email) values ('friend@example.com');
-```
+メンバーの追加・有効化・削除は、ログイン後に管理者へ表示される「管理」画面から行えます。管理者は一般メンバーを管理でき、super userは管理者／super userのロール変更もできます。
 
 ## 3. Google OAuthを設定する
 
@@ -76,4 +72,4 @@ http://localhost:3000 を開く。ホワイトリストに登録したGoogleア�
 
 ## 実装範囲
 
-Phase 1からPhase 5（イベント企画・3ペイン統合・モバイル下部タブ）まで実装済みです。次は許可メールと権限を管理する管理画面（Phase 6）を予定しています。
+Phase 1からPhase 6（イベント企画・3ペイン統合・モバイル下部タブ・管理画面）まで実装済みです。管理画面を使う前に、`0004_admin_roles.sql` の適用が必要です。

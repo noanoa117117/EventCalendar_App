@@ -10,6 +10,7 @@
 
 export type EventParticipantStatus = "going" | "maybe" | "declined";
 export type EventStatus = "published" | "cancelled";
+export type AllowedEmailRole = "member" | "admin" | "super_user";
 
 export interface Database {
   public: {
@@ -19,12 +20,14 @@ export interface Database {
           id: string;
           email: string;
           is_enabled: boolean;
+          role: AllowedEmailRole;
           created_at: string;
         };
         Insert: {
           id?: string;
           email: string;
           is_enabled?: boolean;
+          role?: AllowedEmailRole;
           created_at?: string;
         };
         Update: Partial<Database["public"]["Tables"]["allowed_emails"]["Insert"]>;
@@ -151,6 +154,16 @@ export interface Database {
         };
         Returns: void;
       };
+      current_user_role: { Args: Record<string, never>; Returns: AllowedEmailRole | null };
+      is_admin: { Args: Record<string, never>; Returns: boolean };
+      is_super_user: { Args: Record<string, never>; Returns: boolean };
+      list_managed_allowed_emails: {
+        Args: Record<string, never>;
+        Returns: Database["public"]["Tables"]["allowed_emails"]["Row"][];
+      };
+      set_member_access: { Args: { p_email: string; p_enabled: boolean }; Returns: void };
+      delete_member: { Args: { p_email: string }; Returns: void };
+      set_allowed_email_role: { Args: { p_email: string; p_role: AllowedEmailRole }; Returns: void };
     };
     Enums: Record<string, never>;
   };

@@ -8,7 +8,7 @@ export default async function HomePage() {
     const planning = getDevPlanningData();
     const availability = getDevAvailabilityData();
     const events = getDevPreviewData();
-    return <Dashboard currentUser={planning.currentUser} members={planning.members} slots={planning.initialSlots} presets={availability.initialPresets} events={events.events} participants={events.participants} preview />;
+    return <Dashboard currentUser={planning.currentUser} members={planning.members} slots={planning.initialSlots} presets={availability.initialPresets} events={events.events} participants={events.participants} role="super_user" preview />;
   }
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -22,5 +22,6 @@ export default async function HomePage() {
     supabase.from("availability_slots").select("*").eq("user_id", user.id),
   ]);
   if (!currentUser) redirect("/setup-nickname");
-  return <Dashboard currentUser={currentUser} members={members ?? []} slots={slots ?? []} presets={presets ?? []} events={events ?? []} participants={participants ?? []} />;
+  const { data: role } = await supabase.rpc("current_user_role");
+  return <Dashboard currentUser={currentUser} members={members ?? []} slots={slots ?? []} presets={presets ?? []} events={events ?? []} participants={participants ?? []} role={role} />;
 }

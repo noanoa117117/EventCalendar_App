@@ -46,8 +46,14 @@ export function AvailabilityBoard({
   const [presets, setPresets] = useState<Preset[]>(initialPresets);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
   const [slots, setSlots] = useState<Slot[]>(initialSlots);
+  const slotsRef = useRef(initialSlots);
   const [loading, setLoading] = useState(false);
   const fetchGeneration = useRef(0);
+
+  function replaceSlots(next: Slot[]) {
+    slotsRef.current = next;
+    setSlots(next);
+  }
 
   const editableWindow = useMemo(() => registrableWindow(), []);
   const activePreset = presets.find((p) => p.id === activePresetId) ?? null;
@@ -61,7 +67,7 @@ export function AvailabilityBoard({
     if (preview) return;
     const generation = ++fetchGeneration.current;
     if (visibleIds.size === 0) {
-      setSlots([]);
+      replaceSlots([]);
       return;
     }
     setLoading(true);
@@ -78,7 +84,7 @@ export function AvailabilityBoard({
       toast.error("空き時間の取得に失敗しました。");
       return;
     }
-    setSlots(data ?? []);
+    replaceSlots(data ?? []);
   }, [visibleIds, range, preview]);
 
   useEffect(() => {
@@ -110,12 +116,12 @@ export function AvailabilityBoard({
 
   async function handlePaint(dates: string[], action: "apply" | "remove", preset: Preset) {
     if (preview) {
-      setSlots((prev) => {
-        const next = action === "apply"
-        ? [...prev.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.preset_id === preset.id)), ...dates.map((date, i) => ({ id: `preview-${Date.now()}-${i}`, user_id: currentUser.id, date, start_time: preset.start_time, end_time: preset.end_time, preset_id: preset.id }))]
-        : prev.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.start_time === preset.start_time && s.end_time === preset.end_time));
-        onAvailabilityChanged?.(next); return next;
-      });
+      const previous = slotsRef.current;
+      const next = action === "apply"
+        ? [...previous.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.preset_id === preset.id)), ...dates.map((date, i) => ({ id: `preview-${Date.now()}-${i}`, user_id: currentUser.id, date, start_time: preset.start_time, end_time: preset.end_time, preset_id: preset.id }))]
+        : previous.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.start_time === preset.start_time && s.end_time === preset.end_time));
+      replaceSlots(next);
+      onAvailabilityChanged?.(next);
       return;
     }
     const supabase = createClient();
@@ -141,12 +147,12 @@ export function AvailabilityBoard({
     action: "apply" | "remove",
   ) {
     if (preview) {
-      setSlots((prev) => {
-        const next = action === "apply"
-        ? [...prev.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end)), { id: `preview-${Date.now()}`, user_id: currentUser.id, date, start_time: start, end_time: end, preset_id: null }]
-        : prev.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end));
-        onAvailabilityChanged?.(next); return next;
-      });
+      const previous = slotsRef.current;
+      const next = action === "apply"
+        ? [...previous.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end)), { id: `preview-${Date.now()}`, user_id: currentUser.id, date, start_time: start, end_time: end, preset_id: null }]
+        : previous.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end));
+      replaceSlots(next);
+      onAvailabilityChanged?.(next);
       return;
     }
     const supabase = createClient();

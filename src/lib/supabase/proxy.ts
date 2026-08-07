@@ -7,7 +7,7 @@ const PUBLIC_PATHS = ["/login", "/auth/callback", "/access-denied"];
 
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
-  if (pathname === "/dev-preview") {
+  if (pathname === "/dev-preview" || (isDevPreviewEnabled() && pathname === "/admin")) {
     return NextResponse.next({ request });
   }
   if (isDevPreviewEnabled() && (pathname === "/" || pathname === "/events" || pathname === "/availability" || pathname === "/planning")) {
@@ -64,6 +64,15 @@ export async function updateSession(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/access-denied";
     return NextResponse.redirect(url);
+  }
+
+  if (pathname === "/admin") {
+    const { data: admin } = await supabase.rpc("is_admin");
+    if (!admin) {
+      const url = request.nextUrl.clone();
+      url.pathname = "/access-denied";
+      return NextResponse.redirect(url);
+    }
   }
 
   if (pathname === "/login" || pathname.startsWith("/access-denied")) {

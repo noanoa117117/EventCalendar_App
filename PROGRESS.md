@@ -5,9 +5,9 @@
 
 ## 現在のフェーズ
 
-**Phase 1-5: 実装・ビルド確認まで完了。実ブラウザE2Eはまだ（下記TODO）。**
+**Phase 1-6: 実装・ビルド確認まで完了。実ブラウザE2Eと新migrationの適用はまだ（下記TODO）。**
 
-## Done（Phase 1-5 実装）
+## Done（Phase 1-6 実装）
 
 - [x] Next.js 16 (App Router) + TypeScript + Tailwind v4 + shadcn/ui scaffold
 - [x] Supabaseクライアント（browser/server）+ `src/proxy.ts`（認証・ホワイトリスト・ニックネーム未設定のリダイレクトゲート）
@@ -41,6 +41,11 @@
   - 開発プレビューでイベント画面と空き時間画面の両方を確認可能
 - [x] Phase 4（画面③）: 選択メンバーの共通空き時間をJST・30分単位で集計し、候補から30/60/90/120分のイベントを作成
 - [x] Phase 5: 企画／イベント／空き時間の3ペイン統合と、モバイル下部タブ
+- [x] Phase 6: 管理画面とロール管理
+  - 通常ユーザー／管理者／super user の3段階
+  - 初期super userは `sinigamiyuuna@gmail.com`
+  - 管理者は一般メンバーの許可メールを管理し、super userは権限変更も可能
+  - 最後の有効super userはDB側で保護
 
 ## TODO（ユーザー側の環境構築作業）
 
@@ -50,10 +55,11 @@
 - [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 - [ ] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
 - [ ] 実ブラウザで3ペインの幅・スクロール・モバイル下部タブ、および空き時間更新後の企画候補再集計を確認
+- [ ] `0004_admin_roles.sql` をSupabaseへ適用し、`/admin` のロール管理を確認
 
 ## 次のフェーズ（未着手）
 
-- **Phase 6**: 管理画面。権限は通常ユーザー／管理者／super userの3段階。初期super userは `sinigamiyuuna@gmail.com`。
+- 実ブラウザレビューで見つかったP2以降の操作性改善を優先する。
 
 ## 設計メモ・ハマりどころ
 
@@ -63,3 +69,4 @@
 - **ESLintの `react-hooks/set-state-in-effect`**: React 19/Next16のリンタがdata-fetching effectパターンにも反応する。`availability-board.tsx` の一箇所のみ理由コメント付きで意図的にdisable。同種のケースが増える場合はSWR/React Query導入も検討（現状の技術スタックには未採用）。
 - **開発時の認証バイパス**: `src/lib/dev-auth.ts` は `NODE_ENV === "development"` と `DEV_BYPASS_AUTH === "true"` の両方が揃う場合だけ有効。実DBを使うE2Eではこのフラグを使わず、Googleテストアカウントをホワイトリストに登録して確認する。
 - **Phase 5の統合状態**: ルート `/` が統合ダッシュボード。個別画面 `/planning`、`/events`、`/availability` は残している。実ブラウザでの最終確認が必要。
+- **管理権限**: `0004_admin_roles.sql` のsecurity-definer RPCが唯一の許可メール／ロール更新経路。`allowed_emails` のテーブル読み取りを復活させてはならない。
