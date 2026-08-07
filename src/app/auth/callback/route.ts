@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { appOriginForRequest } from "@/lib/cloudflare-access";
 import { createClient } from "@/lib/supabase/server";
 
 function safeNextPath(value: string | null, origin: string) {
@@ -23,15 +24,16 @@ function safeNextPath(value: string | null, origin: string) {
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
-  const next = safeNextPath(url.searchParams.get("next"), url.origin);
+  const origin = appOriginForRequest(request);
+  const next = safeNextPath(url.searchParams.get("next"), origin);
   const supabase = await createClient();
 
   const {
     data: { user },
   } = await supabase.auth.getUser();
   if (user) {
-    return NextResponse.redirect(new URL(next, url.origin));
+    return NextResponse.redirect(new URL(next, origin));
   }
 
-  return NextResponse.redirect(new URL("/login", url.origin));
+  return NextResponse.redirect(new URL("/login", origin));
 }

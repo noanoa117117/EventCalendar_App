@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
 import { before, test } from "node:test";
 import { exportJWK, generateKeyPair, SignJWT } from "jose";
-// @ts-expect-error Node's built-in TypeScript test runner requires the extension at runtime.
-import { isLocalAuthAllowed, isLoopbackSupabaseUrl, verifyCloudflareAccessToken } from "../src/lib/cloudflare-access.ts";
-// @ts-expect-error Node's built-in TypeScript test runner requires the extension at runtime.
+import {
+  appOriginForRequest,
+  cloudflareAppOrigin,
+  isExpectedCloudflareAppRequest,
+  isLocalAuthAllowed,
+  isLoopbackSupabaseUrl,
+  verifyCloudflareAccessToken,
+} from "../src/lib/cloudflare-access.ts";
 import { generateSupabaseMagicLink, generateSupabaseMagicLinkIfAllowed, safeNextPath } from "../src/lib/cloudflare-auth-bridge.ts";
 
 const { privateKey, publicKey } = await generateKeyPair("RS256");
@@ -16,6 +21,7 @@ globalThis.fetch = async () => new Response(JSON.stringify({
 before(() => {
   process.env.CF_ACCESS_TEAM_DOMAIN = issuer;
   process.env.CF_ACCESS_AUD = "audience";
+  process.env.APP_ORIGIN = "https://invitation-event-calendar.amida-solutions.uk";
 });
 
 async function token(overrides: Record<string, unknown> = {}, key = privateKey) {
@@ -82,6 +88,32 @@ test("allows local auth only in development with loopback Supabase", () => {
   assert.equal(isLocalAuthAllowed(), false);
   assert.equal(isLoopbackSupabaseUrl("http://localhost:54321"), true);
   assert.equal(isLoopbackSupabaseUrl("https://supabase.test"), false);
+});
+
+test("accepts only the configured Cloudflare application origin", () => {
+  process.env.AUTH_MODE = "cloudflare";
+  process.env.APP_ORIGIN = "https://invitation-event-calendar.amida-solutions.uk";
+  assert.equal(cloudflareAppOrigin(), "https://invitation-event-calendar.amida-solutions.uk");
+  assert.equal(isExpectedCloudflareAppRequest(new Request("https://invitation-event-calendar.amida-solutions.uk/events")), true);
+  assert.equal(isExpectedCloudflareAppRequest(new Request("https://INVITATION-EVENT-CALENDAR.AMIDA-SOLUTIONS.UK/events")), true);
+  assert.equal(isExpectedCloudflareAppRequest(new Request("https://invitation-event-calendar.amida-solutions.uk/events", {
+    headers: { host: "attacker.example", "x-forwarded-host": "attacker.example" },
+  })), true);
+  assert.equal(isExpectedCloudflareAppRequest(new Request("http://invitation-event-calendar.amida-solutions.uk/events")), false);
+  assert.equal(isExpectedCloudflareAppRequest(new Request("https://invitation-event-calendar.amida-solutions.uk.evil.example/events")), false);
+  assert.equal(isExpectedCloudflareAppRequest(new Request("https://attacker.example/events", {
+    headers: { host: "invitation-event-calendar.amida-solutions.uk" },
+  })), false);
+  assert.equal(isExpectedCloudflareAppRequest(new Request("https://calendar-amida-solutions-uk.workers.dev/events")), false);
+  assert.equal(appOriginForRequest(new Request("https://attacker.example/events")), "https://invitation-event-calendar.amida-solutions.uk");
+});
+
+test("rejects malformed or missing Cloudflare application origins", () => {
+  for (const origin of ["", "http://invitation-event-calendar.amida-solutions.uk", "https://invitation-event-calendar.amida-solutions.uk:8443", "https://invitation-event-calendar.amida-solutions.uk/path"]) {
+    process.env.APP_ORIGIN = origin;
+    assert.throws(() => cloudflareAppOrigin());
+  }
+  process.env.APP_ORIGIN = "https://invitation-event-calendar.amida-solutions.uk";
 });
 
 test("rejects production local mode", () => {

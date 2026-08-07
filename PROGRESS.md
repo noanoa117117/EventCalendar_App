@@ -13,7 +13,7 @@
 | 管理画面 | 実装済み・要DB適用確認 | UI/RPCは `0005_admin_access_controls.sql` と `0006` を前提にする。実環境では少なくとも `0001`〜`0004` 適用済み。`0005`/`0006` の適用状況は未記録なので、推測で扱わない。 |
 | ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
 | Cloudflare Access 認証 | 実装済み・未コミット | JWT検証→Supabase allowlist→SSRセッション発行。11テストは成功済み。Cloudflare Dashboard/本番Secretは未設定。 |
-| Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solution.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
+| Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solutions.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
 
 ### 次に行うこと（優先順）
 
@@ -95,10 +95,10 @@
 
 ### Cloudflare Workers移行（未コミット・未デプロイ）
 
-- **変更理由**: Vercel/Ubuntuを使わず、Cloudflare Accessの直後でNext.jsを実行するため。対象ドメインは`invitation-event-calendar.amida-solution.uk`。
+- **変更理由**: Vercel/Ubuntuを使わず、Cloudflare Accessの直後でNext.jsを実行するため。対象ドメインは`invitation-event-calendar.amida-solutions.uk`。
 - **互換性判断**: Next `16.3.0`の`proxy.ts`はNode runtime固定だが、OpenNext CloudflareはNode.js Middlewareを未サポート。そのため`src/proxy.ts`を削除し、同じ認証ゲートをEdge互換legacy `src/middleware.ts`へ移した。これはOpenNextがNode Proxyに対応するまでの互換性負債であり、将来の戻しには同じE2Eを再実施する。
 - **変更ファイル**: `open-next.config.ts`、`wrangler.jsonc`、`next.config.ts`、`package.json`、`public/_headers`、`.gitignore`、`src/middleware.ts`、認証/redirect helper、環境テンプレート、README。`workers_dev=false`、`preview_urls=false`、`keep_vars=true`、`nodejs_compat`、Custom Domain固定を設定。`keep_vars=true`によりWrangler再デプロイでDashboard管理のruntime Variablesを消さない。
-- **追加防御**: `AUTH_MODE=cloudflare`では`APP_ORIGIN=https://invitation-event-calendar.amida-solution.uk`とrequest originの完全一致を必須にし、Vercel URL、workers.dev、Preview URL、任意Hostからは公開パスを含め403。redirect先はHostヘッダーではなく設定済みoriginから作る。
+- **追加防御**: `AUTH_MODE=cloudflare`では`APP_ORIGIN=https://invitation-event-calendar.amida-solutions.uk`とrequest originの完全一致を必須にし、Vercel URL、workers.dev、Preview URL、任意Hostからは公開パスを含め403。redirect先はHostヘッダーではなく設定済みoriginから作る。
 - **検証済み**: `npm test` 13件、`npm run lint`、`npm run build`、`npm run build:worker`、`git diff --check`。workerd local previewで想定Hostの`/login=200`、JWTなしの`/events`・`/availability`・`/auth/cloudflare`・未定義API=403、不正Host=403。
 - **Secret判断**: Service Role KeyはRLSを迂回できるためruntime Workers Secretだけに置く。現行OpenNext buildは不要なのでBuild環境へ複製しない。将来buildで必要になった場合だけ、平文VariableではなくBuild Secretとして設定する。
 - **未確認**: 実Cloudflare Access JWTの透過、allowlist後のSupabase Set-Cookieの実ドメイン永続化、logout、JWKSネットワーク取得、Workers Buildsのruntime/build variables、Custom Domain/DNS、Access Policy。これらを通すまで本番デプロイしない。

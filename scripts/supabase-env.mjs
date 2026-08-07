@@ -90,6 +90,7 @@ if (target === "local") {
     url: remote.NEXT_PUBLIC_SUPABASE_URL,
     anonKey: remote.NEXT_PUBLIC_SUPABASE_ANON_KEY,
     authMode: remote.AUTH_MODE,
+    appOrigin: remote.APP_ORIGIN,
     cfTeamDomain: remote.CF_ACCESS_TEAM_DOMAIN,
     cfAudience: remote.CF_ACCESS_AUD,
     serviceRoleKey: remote.SUPABASE_SERVICE_ROLE_KEY,
@@ -98,12 +99,16 @@ if (target === "local") {
     console.error("The remote environment must set DEV_BYPASS_AUTH=false.");
     process.exit(1);
   }
-  if (values.authMode !== "cloudflare" || !isSafeValue(values.cfTeamDomain) || !isSafeValue(values.cfAudience) || !isSafeValue(values.serviceRoleKey)) {
+  if (values.authMode !== "cloudflare" || !isSafeValue(values.appOrigin) || !isSafeValue(values.cfTeamDomain) || !isSafeValue(values.cfAudience) || !isSafeValue(values.serviceRoleKey)) {
     console.error("The remote environment must configure AUTH_MODE=cloudflare and all Cloudflare/Supabase server credentials.");
     process.exit(1);
   }
   if (!isExpectedUrl(values.url, "remote")) {
     console.error("The remote environment did not provide a valid Supabase URL.");
+    process.exit(1);
+  }
+  if (values.appOrigin !== "https://invitation-event-calendar.amida-solutions.uk") {
+    console.error("The remote environment must set APP_ORIGIN=https://invitation-event-calendar.amida-solutions.uk.");
     process.exit(1);
   }
 }
@@ -121,6 +126,7 @@ const output = [
   ...(target === "remote" ? [
     `CF_ACCESS_TEAM_DOMAIN=${values.cfTeamDomain}`,
     `CF_ACCESS_AUD=${values.cfAudience}`,
+    `APP_ORIGIN=${values.appOrigin}`,
     `SUPABASE_SERVICE_ROLE_KEY=${values.serviceRoleKey}`,
   ] : []),
 ].join("\n") + "\n";

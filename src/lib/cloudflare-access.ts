@@ -36,6 +36,42 @@ function teamDomain() {
   return url.origin;
 }
 
+/**
+ * The public application origin is deliberately configured rather than derived
+ * from a request Host header. Cloudflare mode is never valid on a preview,
+ * workers.dev, Vercel, or arbitrary direct origin.
+ */
+export function cloudflareAppOrigin() {
+  const value = required("APP_ORIGIN");
+  const url = new URL(value);
+  if (
+    url.protocol !== "https:" ||
+    url.username ||
+    url.password ||
+    url.port ||
+    url.search ||
+    url.hash ||
+    url.pathname !== "/"
+  ) {
+    throw new Error("APP_ORIGIN must be an HTTPS origin without a path");
+  }
+  return url.origin;
+}
+
+export function isExpectedCloudflareAppRequest(request: Request) {
+  try {
+    return new URL(request.url).origin === cloudflareAppOrigin();
+  } catch {
+    return false;
+  }
+}
+
+export function appOriginForRequest(request: Request) {
+  return process.env.AUTH_MODE === "cloudflare"
+    ? cloudflareAppOrigin()
+    : new URL(request.url).origin;
+}
+
 export async function verifyCloudflareAccessToken(token: string) {
   const issuer = teamDomain();
   const audience = required("CF_ACCESS_AUD");

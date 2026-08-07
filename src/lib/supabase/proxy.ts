@@ -2,7 +2,12 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
 import { isDevPreviewEnabled } from "@/lib/dev-auth";
-import { cloudflareAccessToken, isLocalAuthAllowed, verifyCloudflareAccessToken } from "@/lib/cloudflare-access";
+import {
+  cloudflareAccessToken,
+  isExpectedCloudflareAppRequest,
+  isLocalAuthAllowed,
+  verifyCloudflareAccessToken,
+} from "@/lib/cloudflare-access";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/auth/cloudflare", "/access-denied"];
 
@@ -13,7 +18,7 @@ function isPublicPath(pathname: string) {
 export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const publicPath = isPublicPath(pathname);
-  if (pathname === "/dev-preview" || (isDevPreviewEnabled() && pathname === "/admin")) {
+  if (isDevPreviewEnabled() && (pathname === "/dev-preview" || pathname === "/admin")) {
     return NextResponse.next({ request });
   }
   if (isDevPreviewEnabled() && (pathname === "/" || pathname === "/events" || pathname === "/availability" || pathname === "/planning")) {
@@ -41,6 +46,9 @@ export async function updateSession(request: NextRequest) {
   }
   if (!localMode && !cloudflareMode) {
     return new NextResponse("Authentication configuration required", { status: 500 });
+  }
+  if (cloudflareMode && !isExpectedCloudflareAppRequest(request)) {
+    return new NextResponse("Unrecognized application origin", { status: 403 });
   }
   let cloudflareEmail: string | null = null;
   if (cloudflareMode && !publicPath) {

@@ -37,16 +37,16 @@ npm run dev:local
 本番はVercel、Ubuntu、Cloudflare Pagesの静的exportを使いません。
 
 ```text
-利用者 → invitation-event-calendar.amida-solution.uk
+利用者 → invitation-event-calendar.amida-solutions.uk
        → Cloudflare Access → Cloudflare Workers（Next.js / OpenNext）
        → Supabase
 ```
 
-`wrangler.jsonc` は `workers_dev=false`、`preview_urls=false`、`keep_vars=true`、Custom Domain `invitation-event-calendar.amida-solution.uk` を固定しています。`*.workers.dev`やPreview URLを本番経路にしません。`keep_vars=true`により、Wranglerで再デプロイしてもDashboardを正本とするruntime Variablesを削除しません。
+`wrangler.jsonc` は `workers_dev=false`、`preview_urls=false`、`keep_vars=true`、Custom Domain `invitation-event-calendar.amida-solutions.uk` を固定しています。`*.workers.dev`やPreview URLを本番経路にしません。`keep_vars=true`により、Wranglerで再デプロイしてもDashboardを正本とするruntime Variablesを削除しません。
 
 ### Cloudflare Access Application
 
-Applicationの対象hostnameは `invitation-event-calendar.amida-solution.uk` にします。推奨Policyは次のとおりです。
+Applicationの対象hostnameは `invitation-event-calendar.amida-solutions.uk` にします。推奨Policyは次のとおりです。
 
 - Action: `Allow`
 - Include: `Everyone`
@@ -66,7 +66,7 @@ Workers & Pages → 対象Worker → Settings → Variables and Secretsで、**r
 | Variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key |
 | Variable | `AUTH_MODE` | `cloudflare` |
 | Variable | `DEV_BYPASS_AUTH` | `false` |
-| Variable | `APP_ORIGIN` | `https://invitation-event-calendar.amida-solution.uk` |
+| Variable | `APP_ORIGIN` | `https://invitation-event-calendar.amida-solutions.uk` |
 | Variable | `CF_ACCESS_TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
 | Variable | `CF_ACCESS_AUD` | Access ApplicationのAUD |
 | Secret | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key |
