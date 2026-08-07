@@ -21,11 +21,11 @@ export function AppHeader({
   onBeforeNavigate?: () => boolean;
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 shadow-sm md:px-8">
-      <nav className="flex items-center gap-1 text-sm" aria-label="メインナビゲーション">
+    <header className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-3 py-2 shadow-sm md:gap-3 md:px-8 md:py-3">
+      <nav className="grid w-full grid-cols-3 gap-1 rounded-lg bg-muted/60 p-1 text-sm md:flex md:w-auto md:bg-transparent md:p-0" aria-label="メインナビゲーション">
         {pages.map((p) =>
           p.key === current ? (
-            <span key={p.key} className="rounded-md bg-muted px-2.5 py-1 font-medium">
+            <span key={p.key} className="rounded-md bg-background py-2 text-center font-medium shadow-sm md:bg-muted md:px-3 md:py-1 md:shadow-none">
               {p.label}
             </span>
           ) : (
@@ -35,14 +35,14 @@ export function AppHeader({
               onClick={(e) => {
                 if (onBeforeNavigate && !onBeforeNavigate()) e.preventDefault();
               }}
-              className="rounded-md px-2.5 py-1 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+              className="rounded-md py-2 text-center text-muted-foreground transition-colors hover:bg-accent hover:text-foreground md:px-3 md:py-1"
             >
               {p.label}
             </Link>
           ),
         )}
       </nav>
-      {children && <div className="flex items-center gap-2">{children}</div>}
+      {children && <div className="flex w-full items-center justify-end gap-2 md:w-auto">{children}</div>}
     </header>
   );
 }

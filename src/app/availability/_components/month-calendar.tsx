@@ -208,7 +208,7 @@ export function MonthCalendar({
       </div>
       {dragging && (
         <p className="pointer-events-none px-1 pt-1 text-xs text-muted-foreground">
-          ドラッグ中... 離すと確定します（Escで取り消し）
+          登録中… 離すと確定します（Escで取り消し）
         </p>
       )}
     </div>
