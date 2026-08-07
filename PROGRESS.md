@@ -40,7 +40,7 @@
   - 空き時間ペイントのタッチドラッグ・中断・高速操作、および週表示の指で押せる行高
   - 開発プレビューでイベント画面と空き時間画面の両方を確認可能
 - [x] Phase 4（画面③）: 選択メンバーの共通空き時間をJST・30分単位で集計し、候補から30/60/90/120分のイベントを作成
-- [x] Phase 5: 企画／イベント／空き時間の3ペイン統合と、モバイル下部タブ
+- [x] Phase 5: 企画／イベント／空き時間を独立した3画面として遷移する導線
 - [x] Phase 6: 管理画面とロール管理
   - 通常ユーザー／管理者／super user の3段階
   - 初期super userは `sinigamiyuuna@gmail.com`
@@ -49,13 +49,13 @@
 
 ## TODO（ユーザー側の環境構築作業）
 
-- [x] 実Supabaseプロジェクトを作成し `supabase/migrations/` 配下の全SQL（現在は`0001`〜`0003`）を番号順に適用
+- [x] 実Supabaseプロジェクトを作成し `supabase/migrations/` 配下の全SQL（`0001`〜`0004`）を番号順に適用
 - [x] `supabase/seed.sql` のメールアドレスを自分のものに書き換えて実行（ホワイトリスト登録）
 - [x] Google Cloud ConsoleでOAuthクライアント作成 → SupabaseのGoogle Provider設定
 - [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 - [ ] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
-- [ ] 実ブラウザで3ペインの幅・スクロール・モバイル下部タブ、および空き時間更新後の企画候補再集計を確認
-- [ ] `0004_admin_roles.sql` をSupabaseへ適用し、`/admin` のロール管理を確認
+- [ ] 実ブラウザで①→②→③の画面遷移、モバイルでの各画面の操作性、および空き時間更新後の企画候補再集計を確認
+- [ ] `/admin` で許可メール管理・ロール変更を確認
 
 ## 次のフェーズ（未着手）
 
@@ -68,5 +68,5 @@
 - **`set_availability` RPCが空き時間変更とマージ/分割正規化の唯一の経路**。`availability_slots` のクライアントからの直接書き込み権限は剥奪済みで、RPC側で許可済みユーザー・本人・JSTの登録可能期間を検証する。
 - **ESLintの `react-hooks/set-state-in-effect`**: React 19/Next16のリンタがdata-fetching effectパターンにも反応する。`availability-board.tsx` の一箇所のみ理由コメント付きで意図的にdisable。同種のケースが増える場合はSWR/React Query導入も検討（現状の技術スタックには未採用）。
 - **開発時の認証バイパス**: `src/lib/dev-auth.ts` は `NODE_ENV === "development"` と `DEV_BYPASS_AUTH === "true"` の両方が揃う場合だけ有効。実DBを使うE2Eではこのフラグを使わず、Googleテストアカウントをホワイトリストに登録して確認する。
-- **Phase 5の統合状態**: ルート `/` が統合ダッシュボード。個別画面 `/planning`、`/events`、`/availability` は残している。実ブラウザでの最終確認が必要。
+- **Phase 5の画面構成**: ルート `/` は正規の画面①である `/events` へリダイレクトする。画面②は `/availability`、画面③は `/planning`。モバイルで3画面を同時表示しない。
 - **管理権限**: `0004_admin_roles.sql` のsecurity-definer RPCが唯一の許可メール／ロール更新経路。`allowed_emails` のテーブル読み取りを復活させてはならない。

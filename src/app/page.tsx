@@ -1,27 +1,11 @@
 import { redirect } from "next/navigation";
-import { createClient } from "@/lib/supabase/server";
-import { getDevAvailabilityData, getDevPreviewData, getDevPlanningData, isDevPreviewEnabled } from "@/lib/dev-auth";
-import { Dashboard } from "./dashboard/dashboard";
+import { getDevPreviewData, isDevPreviewEnabled } from "@/lib/dev-auth";
+import { EventCalendar } from "./events/event-calendar";
 
 export default async function HomePage() {
   if (isDevPreviewEnabled()) {
-    const planning = getDevPlanningData();
-    const availability = getDevAvailabilityData();
-    const events = getDevPreviewData();
-    return <Dashboard currentUser={planning.currentUser} members={planning.members} slots={planning.initialSlots} presets={availability.initialPresets} events={events.events} participants={events.participants} role="super_user" preview />;
+    const { currentUser, events, participants, people } = getDevPreviewData();
+    return <EventCalendar currentUser={currentUser} initialEvents={events} initialParticipants={participants} people={people} preview />;
   }
-  const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/login");
-  const [{ data: currentUser }, { data: members }, { data: events }, { data: participants }, { data: presets }] = await Promise.all([
-    supabase.from("profiles").select("id, nickname, color").eq("id", user.id).single(),
-    supabase.from("profiles").select("id, nickname, color").order("nickname"),
-    supabase.from("events").select("id, title, description, start_at, end_at, created_by, status, created_at").order("start_at"),
-    supabase.from("event_participants").select("event_id, user_id, status, comment, updated_at"),
-    supabase.from("availability_presets").select("*").eq("user_id", user.id).order("sort_order"),
-  ]);
-  const { data: slots } = await supabase.from("availability_slots").select("*").in("user_id", (members ?? []).map((member) => member.id));
-  if (!currentUser) redirect("/setup-nickname");
-  const { data: role } = await supabase.rpc("current_user_role");
-  return <Dashboard currentUser={currentUser} members={members ?? []} slots={slots ?? []} presets={presets ?? []} events={events ?? []} participants={participants ?? []} role={role} />;
+  redirect("/events");
 }

@@ -190,6 +190,11 @@ export function AvailabilityBoard({
   return (
     <div className={`flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col bg-border`}>
       {preview && !compact && <div className="bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-800">ローカルモック（Supabaseには接続しません）</div>}
+      {!compact && <nav aria-label="メインナビゲーション" className="flex items-center gap-4 border-b bg-background px-4 py-2 text-sm">
+        <Link href="/events" className="text-muted-foreground underline-offset-4 hover:underline">イベント一覧</Link>
+        <Link href="/planning" className="text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link>
+        <span className="font-medium">空き状況</span>
+      </nav>}
       <div className={`flex items-center border-b bg-background px-3 py-2 ${compact ? "" : "md:hidden"}`}>
         <Tabs value={mobilePanel} onValueChange={(v) => setMobilePanel(v as typeof mobilePanel)} className="flex-1">
           <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger><TabsTrigger value="presets">プリセット</TabsTrigger></TabsList>

@@ -8,7 +8,7 @@ import { CalendarDays, ChevronLeft, ChevronRight, CircleX, Pencil, Plus, Users, 
 import { toast } from "sonner";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import type { Database, EventParticipantStatus, EventStatus } from "@/lib/database.types";
+import type { AllowedEmailRole, Database, EventParticipantStatus, EventStatus } from "@/lib/database.types";
 import type { Profile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,7 +25,7 @@ const JST = "Asia/Tokyo";
 const asJstCalendarDate = (value: Date | string) => toZonedTime(typeof value === "string" ? new Date(value) : value, JST);
 const statusLabel: Record<EventParticipantStatus, string> = { going: "参加", maybe: "未定", declined: "不参加" };
 
-export function EventCalendar({ currentUser, initialEvents, initialParticipants, people, preview = false, compact = false }: { currentUser: Profile; initialEvents: Event[]; initialParticipants: Participant[]; people: Profile[]; preview?: boolean; compact?: boolean }) {
+export function EventCalendar({ currentUser, initialEvents, initialParticipants, people, role, preview = false, compact = false }: { currentUser: Profile; initialEvents: Event[]; initialParticipants: Participant[]; people: Profile[]; role?: AllowedEmailRole | null; preview?: boolean; compact?: boolean }) {
   const [events, setEvents] = useState(initialEvents);
   const [participants, setParticipants] = useState(initialParticipants);
   // Keep date-fns' calendar arithmetic based on JST-shaped calendar dates so
@@ -109,7 +109,7 @@ export function EventCalendar({ currentUser, initialEvents, initialParticipants,
   return <main className={`${compact ? "min-h-0" : "min-h-dvh"} bg-muted/20`}>
     {!compact && <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 md:px-8">
       <div className="flex items-center gap-2"><CalendarDays className="size-5" /><h1 className="text-lg font-semibold">イベントカレンダー</h1><span className="text-sm text-muted-foreground">{currentUser.nickname}</span></div>
-      <div className="flex items-center gap-2"><Link href="/planning" className="text-sm text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link><Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き状況</Link>{preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}<Button size="sm" onClick={() => setPanel({ kind: "form", event: null })}><Plus /> イベント作成</Button>{!preview && <SignOutButton variant="ghost" />}</div>
+      <div className="flex items-center gap-2"><Link href="/planning" className="text-sm text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link><Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き状況</Link>{(role === "admin" || role === "super_user") && <Link href="/admin" className="text-sm text-muted-foreground underline-offset-4 hover:underline">管理</Link>}{preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}<Button size="sm" onClick={() => setPanel({ kind: "form", event: null })}><Plus /> イベント作成</Button>{!preview && <SignOutButton variant="ghost" />}</div>
     </header>}
     <div className={`mx-auto grid max-w-7xl gap-4 p-4 ${compact ? "grid-cols-1" : "md:grid-cols-[1fr_320px] md:p-8"}`}>
       <section className="overflow-hidden rounded-xl border bg-background">

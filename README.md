@@ -1,7 +1,7 @@
 # 空き時間カレンダー（Phase 1-6）
 
 Next.js 16 (App Router) + Supabase。Phase 1（認証・ニックネーム・DBスキーマ）、
-Phase 2（画面②: 個人の空き時間登録）、Phase 3（画面①: 共有イベントカレンダー）、Phase 4（画面③: イベント企画）、Phase 5（統合レイアウト）、Phase 6（管理画面）の実装です。仕様は [REQUIREMENTS.md](./REQUIREMENTS.md)、
+Phase 2（画面②: 個人の空き時間登録）、Phase 3（画面①: 共有イベントカレンダー）、Phase 4（画面③: イベント企画）、Phase 5（3画面の導線整理）、Phase 6（管理画面）の実装です。仕様は [REQUIREMENTS.md](./REQUIREMENTS.md)、
 進捗・ネクストステップは [PROGRESS.md](./PROGRESS.md) を参照してください（作業したら更新すること）。
 
 ## 1. Supabaseプロジェクトを作成する
@@ -62,7 +62,7 @@ npm install
 npm run dev
 ```
 
-http://localhost:3000 を開く。ホワイトリストに登録したGoogleアカウントでログインすると、初回はニックネーム設定画面、その後は企画／イベント／空き時間の統合ダッシュボードに入ります。
+http://localhost:3000 を開く。ホワイトリストに登録したGoogleアカウントでログインすると、初回はニックネーム設定画面、その後は画面①の共有イベントカレンダー（`/events`）に入ります。画面②の空き時間（`/availability`）と画面③のイベント企画（`/planning`）へは各画面のナビゲーションから移動します。
 
 ## スクリプト
 
@@ -72,4 +72,4 @@ http://localhost:3000 を開く。ホワイトリストに登録したGoogleア�
 
 ## 実装範囲
 
-Phase 1からPhase 6（イベント企画・3ペイン統合・モバイル下部タブ・管理画面）まで実装済みです。管理画面を使う前に、`0004_admin_roles.sql` の適用が必要です。
+Phase 1からPhase 6（イベント企画・3画面の画面遷移・管理画面）まで実装済みです。管理画面を使う前に、`0004_admin_roles.sql` の適用が必要です。

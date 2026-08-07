@@ -3,7 +3,6 @@ import { EventCalendar } from "@/app/events/event-calendar";
 import { getDevPreviewData, getDevAvailabilityData, getDevPlanningData, isDevPreviewEnabled } from "@/lib/dev-auth";
 import { AvailabilityBoard } from "@/app/availability/_components/availability-board";
 import { PlanningBoard } from "@/app/planning/_components/planning-board";
-import { Dashboard } from "@/app/dashboard/dashboard";
 
 export default async function DevPreviewPage({ searchParams }: { searchParams: Promise<{ preview?: string }> }) {
   if (!isDevPreviewEnabled()) notFound();
@@ -14,10 +13,8 @@ export default async function DevPreviewPage({ searchParams }: { searchParams: P
   }
   if (params.preview === "planning") return <PlanningBoard {...getDevPlanningData()} preview />;
   if (!params.preview) {
-    const planning = getDevPlanningData();
-    const availability = getDevAvailabilityData();
-    const events = getDevPreviewData();
-    return <Dashboard currentUser={planning.currentUser} members={planning.members} slots={planning.initialSlots} presets={availability.initialPresets} events={events.events} participants={events.participants} preview />;
+    const { currentUser, events, participants, people } = getDevPreviewData();
+    return <EventCalendar currentUser={currentUser} initialEvents={events} initialParticipants={participants} people={people} preview />;
   }
   if (params.preview === "events") {
     const { currentUser, events, participants, people } = getDevPreviewData();
