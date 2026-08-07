@@ -41,11 +41,11 @@ v0.1 draft を元に、/grill-me セッションで確定した決定事項を�
 
 | 領域 | 採用 | 理由 |
 |---|---|---|
-| フレームワーク | Next.js 15 (App Router) / TypeScript | フロント・API・認証を1リポジトリで完結できる |
+| フレームワーク | Next.js 16 (App Router) / TypeScript | フロント・API・認証を1リポジトリで完結できる |
 | UI | Tailwind CSS + shadcn/ui | カレンダーの独自グリッドを組みやすい |
-| DB / 認証 | Supabase (PostgreSQL + Auth) | Google OAuthが設定のみで動く |
+| DB / 認証 | Supabase (PostgreSQL + Auth) + Cloudflare Access | AccessのGoogle本人確認とDB allowlistを分離できる |
 | ORM | Supabase Client | 小規模なので薄い層で十分 |
-| ホスティング | Vercel | Next.jsとの相性、無料枠で足りる規模 |
+| ホスティング | Cloudflare Workers + OpenNext | Accessの直後でNext.jsを実行し、Custom Domainだけを公開できる |
 | 日付処理 | date-fns / date-fns-tz | moment禁止 |
 
 - カレンダーUIはFullCalendar等のライブラリを使わず自前実装。30分スロットのペイント操作など独自要件が多いため。
@@ -55,7 +55,7 @@ v0.1 draft を元に、/grill-me セッションで確定した決定事項を�
 
 - 許可されたメールアドレスの一覧をDB（例: `allowed_emails` テーブル、または管理用テーブル）で管理。
 - メールアドレスは前後空白を除去し、小文字化した値で照合・一意管理する。無効化されたエントリは許可しない。
-- Google OAuthログイン成功後、認証されたメールアドレスがホワイトリストに存在するかをチェック。
+- Cloudflare AccessでGoogle本人確認後、検証済みJWTのメールアドレスがホワイトリストに存在するかをチェック。
   - 存在しない場合：ログインを拒否し、アクセス不可の旨を表示（アプリ内画面には遷移させない）。
   - 存在する場合：通常のログインフローへ（ニックネーム未設定なら設定画面へ強制遷移）。
 - ホワイトリスト判定は画面遷移だけでなく、保護対象のAPI・DBアクセスでも必ず行う。直接URLやクライアントからのDBアクセスで、ホワイトリスト外ユーザーがアプリデータを取得・更新できてはならない。

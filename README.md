@@ -1,90 +1,126 @@
 # 空き時間カレンダー（Phase 1-6）
 
-Next.js 16 (App Router) + Supabase。Phase 1（認証・ニックネーム・DBスキーマ）、
-Phase 2（画面②: 個人の空き時間登録）、Phase 3（画面①: 共有イベントカレンダー）、Phase 4（画面③: イベント企画）、Phase 5（3画面の導線整理）、Phase 6（管理画面）の実装です。仕様は [REQUIREMENTS.md](./REQUIREMENTS.md)、
-進捗・ネクストステップは [PROGRESS.md](./PROGRESS.md) を参照してください（作業したら更新すること）。
+Next.js 16（App Router）+ Supabase。イベント、空き時間登録、企画、管理画面を実装済みです。進捗と未確認事項は、必ず [PROGRESS.md](./PROGRESS.md) を参照してください。
 
 ## 1. Supabaseプロジェクトを作成する
 
-1. https://supabase.com でプロジェクトを新規作成する（リージョンは Tokyo 推奨）。
-2. プロジェクトの `Settings > API` から以下を控える。
-   - Project URL
-   - `anon` `public` key
+1. https://supabase.com でプロジェクトを新規作成する（Tokyo推奨）。
+2. `Settings > API` から Project URL と anon public key を控える。
 
 ## 2. DBスキーマを適用する
 
-`supabase/migrations/` 配下のすべての移行ファイルを番号順に適用します。どちらかの方法で:
-
-**方法A: Supabase CLI**
+`supabase/migrations/` の `0001` から `0006` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
 
 ```bash
 npx supabase login
-npx supabase link --project-ref <あなたのproject-ref>
+npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-**方法B: ダッシュボードのSQL Editor**
+SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。
 
-`0001_init.sql`、`0002_secure_profile_and_availability_writes.sql`、`0003_harden_authorization_and_availability.sql`、`0004_admin_roles.sql` の順に、各ファイルの中身をSQL Editorへ貼り付けて実行する。
+## 3. ローカル開発・fixture
 
-続けて `supabase/seed.sql` の中身も実行する（自分のメールアドレスをホワイトリストに追加する初期データです。実行前に中のメールアドレスを自分のものに書き換えてください）。
+Node.js 22以上、Docker、Supabase CLIが必要です。
 
-メンバーの追加・有効化・削除は、ログイン後に管理者へ表示される「管理」画面から行えます。管理者は一般メンバーを管理でき、super userは管理者／super userのロール変更もできます。
-
-## 3. Cloudflare Accessを設定する（リモート環境）
-
-Cloudflare Accessでアプリを保護し、以下をサーバー環境変数に設定します。
-
-```env
-AUTH_MODE=cloudflare
-CF_ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com
-CF_ACCESS_AUD=<application audience tag>
-SUPABASE_SERVICE_ROLE_KEY=<Supabase service_role key>
+```bash
+npm install
+npm run dev:local
 ```
 
-`/auth/cloudflare` は `Cf-Access-Jwt-Assertion` をJWKS、issuer、audienceで検証し、`allowed_emails.is_enabled` をサービスロールで照合してSupabase SSRセッションを発行します。サービスキーは `NEXT_PUBLIC_*` にせず、クライアントへ返さないでください。SupabaseのData APIを直接公開する構成ではCloudflareゲートウェイ外の通信を防げないため、必要に応じてSupabaseを非公開ネットワークに置くかBFF化してください。
+`npm run dev` もローカルSupabaseを使います。fixtureの投入は意図的に自動化していません。複数メンバーを確認する時だけ、[supabase/local/README.md](./supabase/local/README.md) の手順でAlice/Bob/Caraのfixtureを投入してください。
 
-### Access Policy（メールをCloudflare側で管理しない設定）
+`.env.local`、`.env.local.remote`、`.dev.vars` はGit管理外です。`DEV_BYPASS_AUTH=true` は開発時の画面プレビュー専用であり、実DB・本番・Workersでは使いません。
+
+## 4. 本番構成: Cloudflare Workers + Cloudflare Access
+
+本番はVercel、Ubuntu、Cloudflare Pagesの静的exportを使いません。
+
+```text
+利用者 → invitation-event-calendar.amida-solution.uk
+       → Cloudflare Access → Cloudflare Workers（Next.js / OpenNext）
+       → Supabase
+```
+
+`wrangler.jsonc` は `workers_dev=false`、`preview_urls=false`、`keep_vars=true`、Custom Domain `invitation-event-calendar.amida-solution.uk` を固定しています。`*.workers.dev`やPreview URLを本番経路にしません。`keep_vars=true`により、Wranglerで再デプロイしてもDashboardを正本とするruntime Variablesを削除しません。
+
+### Cloudflare Access Application
+
+Applicationの対象hostnameは `invitation-event-calendar.amida-solution.uk` にします。推奨Policyは次のとおりです。
 
 - Action: `Allow`
 - Include: `Everyone`
 - Require: `Login Methods` → `Google`
-- Application identity providers: `Google` のみ
-- Apply instant authentication: 有効
+- Application Identity Providers / Login Methods: `Google` のみ
+- Instant authentication: 有効
 
-`Include` に `Everyone` と `Login Methods` を並べるとOR条件になり、Google以外のログイン方法を将来追加した際に通してしまいます。`Login Methods` は `Require` に置いてください。画面で `Require` が選べない場合は、Application identity providers をGoogleだけに限定し、Google以外のIdP／One-time PIN／Bypass policyを追加しないでください。Cloudflareは本人確認だけを担当し、アプリの利用可否は `public.allowed_emails` の有効な行だけで判定します。
+`Everyone` とGoogleをともに`Include`に入れてはいけません。Include条件はORです。One-time PIN、他のIdentity Provider、Bypass Policyは追加しません。CloudflareはGoogleによる本人確認だけを担当し、アプリ利用可否の唯一の正本は`public.allowed_emails`です。Cloudflare側に個別メールアドレスを二重管理しません。
 
-## 4. 環境変数を設定する
+### WorkersのVariablesとSecrets
+
+Workers & Pages → 対象Worker → Settings → Variables and Secretsで、**runtime**に以下を登録します。`APP_ORIGIN`は固定値であり、Hostヘッダーからredirect先を作りません。
+
+| 種別 | 名前 | 値 |
+| --- | --- | --- |
+| Variable | `NEXT_PUBLIC_SUPABASE_URL` | Supabase Project URL |
+| Variable | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | anon public key |
+| Variable | `AUTH_MODE` | `cloudflare` |
+| Variable | `DEV_BYPASS_AUTH` | `false` |
+| Variable | `APP_ORIGIN` | `https://invitation-event-calendar.amida-solution.uk` |
+| Variable | `CF_ACCESS_TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
+| Variable | `CF_ACCESS_AUD` | Access ApplicationのAUD |
+| Secret | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key |
+
+`SUPABASE_SERVICE_ROLE_KEY`は`wrangler.jsonc`や`vars`、`NEXT_PUBLIC_*`、ログ、レスポンスへ書きません。CLIで設定する場合は、値を表示・コミットせずに実行します。
 
 ```bash
-cp .env.local.example .env.local
+npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 ```
 
-`.env.local` を開き、手順1で控えたURLとanon keyを設定する。ローカルでは `AUTH_MODE=local` のままfixtureメール／パスワードでログインします。リモートは `.env.local.remote` に上記Cloudflare変数も設定し、`npm run env:remote` で有効化します。
+Workers Builds/Git連携を使う場合、`NEXT_PUBLIC_SUPABASE_URL`と`NEXT_PUBLIC_SUPABASE_ANON_KEY`はビルド時にも必要です。runtime Variablesとは別のBuild Variablesに同じ環境の公開値を登録します。現在のOpenNext buildはService Role Keyを使わないため、`SUPABASE_SERVICE_ROLE_KEY`をBuild環境へ複製しません。runtimeのWorkers Secretだけに登録し、将来Buildで必要になった場合も平文VariableではなくBuild Secretとしてのみ設定します。
 
-認証なしで画面操作だけを確認したいローカル開発時は、追加で次を設定できる。
+### ビルド、preview、初回デプロイ
 
-```env
-DEV_BYPASS_AUTH=true
-```
-
-これは `npm run dev` 中だけサンプルデータのローカルプレビューを表示する。Supabaseには一切書き込まず、本番ビルド・本番サーバーでは有効にならない。実際のOAuth／DB動作を確認するときは、この値を削除または `false` にして開発サーバーを再起動する。
-
-## 5. 開発サーバーを起動する
+CloudflareのDashboard変更や本番デプロイは、このリポジトリから自動では行いません。設定後、ローカルで確認します。
 
 ```bash
-npm install
-npm run dev
+npm test
+npm run lint
+npm run build
+npm run build:worker
+npm run preview:worker
 ```
 
-http://localhost:3000 を開く。リモートではCloudflare Accessで認証後、許可済みメールアドレスのみ利用できます。
+初回デプロイは、Cloudflareへログイン済みでVariables/Secretsを設定した端末から実行します。
+
+```bash
+npm run deploy:worker
+```
+
+またはCloudflare Workers BuildsでGitHubリポジトリを接続し、Build commandを`npm run build:worker`、Deploy commandを`npm run deploy:worker`として設定します。初回デプロイ後、Custom DomainがWorkerに接続済みであることを確認してください。既存の競合CNAMEがあるhostnameにはCustom Domainを作成できません。
+
+### デプロイ前後の確認とロールバック
+
+デプロイ前は、Worker previewで`/login`が200、JWTなしの`/events`・`/availability`・`/auth/cloudflare`・`/api/*`が403、任意Hostが403であることを確認します。実環境ではCloudflare Access経由の許可メール／未許可メール／無効メール、logout、ニックネーム設定、管理者権限、モバイル操作まで確認します。
+
+障害時はCloudflare Dashboardの以前のWorker Versionを再度デプロイするか、version IDを指定して実行します。
+
+```bash
+npx wrangler rollback <previous-version-id>
+```
+
+## 5. 認証・データ境界の制約
+
+`/auth/cloudflare` は `Cf-Access-Jwt-Assertion` をCloudflare JWKSで検証し、RS256、issuer、AUD、`exp`、`nbf`を必須にします。検証済みemailをtrim+lowercaseして`allowed_emails.is_enabled=true`と照合した後にだけSupabase SSR sessionを発行します。未許可・無効メールはuser/profile/preset/session作成やデータ取得へ進みません。
+
+ブラウザからSupabase Data APIを直接使う構成は今回維持します。RLS、本人確認RPC、allowlistによりanon・未許可ユーザー・他人の空き時間更新を拒否しますが、Cloudflare AccessはこのData API自体を非公開にするものではありません。Supabaseの非公開化またはBFF化は別フェーズです。
 
 ## スクリプト
 
-- `npm run dev` - 開発サーバー
-- `npm run build` - 本番ビルド（型チェック・ESLintを含む）
-- `npm run lint` - ESLintのみ
-
-## 実装範囲
-
-Phase 1からPhase 6（イベント企画・3画面の画面遷移・管理画面）まで実装済みです。管理画面を使う前に、`0004_admin_roles.sql` の適用が必要です。
+- `npm run dev` / `npm run dev:local` — ローカルSupabaseでNext開発サーバー
+- `npm run dev:remote` — `.env.local.remote`を有効化してNext開発サーバー
+- `npm run build` — 通常のNext本番ビルド
+- `npm run build:worker` — OpenNextによるCloudflare Workers変換ビルド
+- `npm run preview:worker` — Worker preview
+- `npm run deploy:worker` — Cloudflare Workersへデプロイ
+- `npm test` / `npm run lint` — 認証・品質確認

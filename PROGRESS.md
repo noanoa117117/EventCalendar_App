@@ -1,11 +1,39 @@
 # 進捗管理
 
-ツール（Claude Code / Codex等）をまたいでも状況が分かるよう、ここで進捗とネクストステップを管理する。
-作業したら都度このファイルを更新すること。仕様の詳細は [REQUIREMENTS.md](./REQUIREMENTS.md)、セットアップ手順は [README.md](./README.md)。
+ツール（Claude Code / Claude / Codex等）をまたいでも、**現在地・確定した判断・未解決課題・次にすること**が分かる運用台帳です。作業を始める前に「現在地」を読み、作業を終えたら該当項目と変更理由・検証結果を更新してください。仕様は [REQUIREMENTS.md](./REQUIREMENTS.md)、手順は [README.md](./README.md)。
 
-## 現在のフェーズ
+## 現在地（最初に読む）
 
-**Phase 1-6: 実装・ビルド確認まで完了。実ブラウザE2Eと新migrationの適用はまだ（下記TODO）。**
+**最終更新: 2026-08-07 / Cloudflare Workers移行を実装・ローカルworkerd検証済み。Cloudflare実環境の設定・staging E2E待ち**
+
+| 項目 | 状態 | 事実・次の判断 |
+| --- | --- | --- |
+| アプリ機能（Phase 1-6） | 実装済み | 画面①イベント、②空き時間、③企画、管理画面まで実装済み。実Supabase上の総合E2Eは未完了。 |
+| 空き時間の保存 | 実装済み・要DB適用確認 | UIは `set_availability_batch` を呼ぶ。実Supabaseに `0006_batch_availability.sql` が適用済みかを最優先で確認する。 |
+| 管理画面 | 実装済み・要DB適用確認 | UI/RPCは `0005_admin_access_controls.sql` と `0006` を前提にする。実環境では少なくとも `0001`〜`0004` 適用済み。`0005`/`0006` の適用状況は未記録なので、推測で扱わない。 |
+| ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
+| Cloudflare Access 認証 | 実装済み・未コミット | JWT検証→Supabase allowlist→SSRセッション発行。11テストは成功済み。Cloudflare Dashboard/本番Secretは未設定。 |
+| Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solution.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
+
+### 次に行うこと（優先順）
+
+1. Cloudflare DashboardでWorker runtime Variables/Secret、Custom Domain、Access Applicationを設定し、stagingまたは本番前のE2Eを行う。デプロイはユーザー承認後にのみ実施する。
+2. 実Supabaseの migration `0005` / `0006` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
+3. 実機E2E（モバイル含む）を行う。ログイン、空き時間の下書き→確定→再読込→削除、他メンバー閲覧、企画、イベント参加、管理画面を確認する。
+
+### Cloudflare Workersの互換性判断
+
+- 調査対象: Next `16.3.0`、`@opennextjs/cloudflare@1.20.2`、認証の [`src/proxy.ts`](./src/proxy.ts) と [`src/lib/supabase/proxy.ts`](./src/lib/supabase/proxy.ts)。
+- 判断: Next 16の `proxy.ts` はNode.js runtime固定。一方、OpenNext CloudflareはNode.js Middlewareを未サポートであり、現在の認証・allowlistゲートをそのまま載せるのは不可。
+- 解決: 認証ゲート全体をEdge/Web APIだけで動くlegacy `src/middleware.ts`へ移した。Next 16.3自体とOpenNext `1.20.2` の組合せは対応範囲であり、問題はProxyの実行形態だけだった。
+- 検証: OpenNext Worker buildでmiddleware handlerを生成し、local workerdで想定ホストの`/login=200`、JWTなしの`/events`・`/availability`・`/auth/cloudflare`・未定義`/api/*=403`、不正Host=403を確認した。実Cloudflare Access JWT、Supabase Cookie永続化、Custom Domainは実環境で要確認。
+
+### 引継ぎルール
+
+- **未確認を完了扱いにしない。** 例: migration適用、Cloudflare Dashboard設定、実機E2Eはユーザーの実施報告または実行ログがあるまで未完了。
+- 作業ごとに「変更ファイル」「なぜ」「検証コマンドと結果」「残課題」をこのファイルへ追記する。
+- Cloudflare Accessは本人確認、`public.allowed_emails` はアプリ利用許可の正本。Cloudflare側で個別メールを二重管理しない。
+- 直接Supabase Data APIをブラウザから使う構成は今回維持する。RLSは必須だが、Cloudflare AccessがData APIを直接保護するわけではない（将来のBFF/非公開化は別フェーズ）。
 
 ## Done（Phase 1-6 実装）
 
@@ -47,11 +75,12 @@
   - 管理者は一般メンバーの許可メールを管理し、super userは権限変更も可能
   - 最後の有効super userはDB側で保護
 
-## TODO（ユーザー側の環境構築作業）
+## ユーザー側で必要な作業（実環境を変更するもの）
 
-- [x] 実Supabaseプロジェクトを作成し `supabase/migrations/` 配下の全SQL（`0001`〜`0004`）を番号順に適用
+- [x] 実Supabaseプロジェクトを作成し `0001`〜`0004` を番号順に適用
+- [ ] `0005_admin_access_controls.sql` / `0006_batch_availability.sql` の実Supabase適用状況を確認し、未適用なら順に適用（適用前に内容を確認する）
 - [x] `supabase/seed.sql` のメールアドレスを自分のものに書き換えて実行（ホワイトリスト登録）
-- [ ] Cloudflare Zero TrustでAccess Applicationを作成し、`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` とサーバー専用の `SUPABASE_SERVICE_ROLE_KEY` を公開環境に設定
+- [ ] Workers移行完了後、Cloudflare Zero TrustでAccess Applicationを作成し、`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` とサーバー専用の `SUPABASE_SERVICE_ROLE_KEY` をWorkersの環境変数／Secretとして設定
 - [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 - [ ] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
 - [ ] 実ブラウザで①→②→③の画面遷移、モバイルでの各画面の操作性、および空き時間更新後の企画候補再集計を確認
@@ -59,36 +88,40 @@
 
 ## 次のフェーズ（未着手）
 
-- 実ブラウザレビューで見つかったP2以降の操作性改善を優先する。
+- Cloudflare Workersのstaging/本番前E2Eを完了する。
+- その後、実ブラウザレビューで見つかったP2以降の操作性改善を扱う。
 
-## Cloudflare Access auth hardening
+## 直近の変更記録
 
-- Root cause: local mode previously trusted only `AUTH_MODE=local`, allowing a
-  production/non-loopback Supabase configuration to bypass the Cloudflare
-  boundary; JWT time claims were optional; and prefix-only public path checks
-  could classify paths such as `/login-evil` as public.
-- Fixes: local mode now requires development plus a loopback Supabase URL;
-  unknown auth modes fail closed; Cloudflare JWT verification requires valid
-  `exp` and `nbf` and explicitly permits only RS256; public paths use
-  exact/boundary matching; and sign-out
-  redirects through the validated team-domain Cloudflare logout endpoint after
-  Supabase sign-out (local mode returns to `/login`).
-- Tests: `npm test` covers valid/normalized identity, missing and forged JWTs,
-  issuer/audience mismatches, expired/future/missing `exp`/`nbf`, JWKS kid
-  rotation, same-origin redirect handling, existing-user reuse without
-  `createUser`, and local-mode configuration. `npm run lint` and `npm run build`
-  pass.
-- Residual limitation: direct Supabase Data API access remains possible outside
-  the Cloudflare gateway when the Supabase project is publicly reachable; use a
-  private network or BFF/API boundary if that threat model must be eliminated.
-- `/auth/cloudflare` now fails closed with HTTP 403 for missing/invalid JWTs and
-  disabled or absent allowlist entries; the normalized allowlist check is
-  completed before magic-link generation, and denied requests do not proceed
-  to session establishment.
+### Cloudflare Workers移行（未コミット・未デプロイ）
+
+- **変更理由**: Vercel/Ubuntuを使わず、Cloudflare Accessの直後でNext.jsを実行するため。対象ドメインは`invitation-event-calendar.amida-solution.uk`。
+- **互換性判断**: Next `16.3.0`の`proxy.ts`はNode runtime固定だが、OpenNext CloudflareはNode.js Middlewareを未サポート。そのため`src/proxy.ts`を削除し、同じ認証ゲートをEdge互換legacy `src/middleware.ts`へ移した。これはOpenNextがNode Proxyに対応するまでの互換性負債であり、将来の戻しには同じE2Eを再実施する。
+- **変更ファイル**: `open-next.config.ts`、`wrangler.jsonc`、`next.config.ts`、`package.json`、`public/_headers`、`.gitignore`、`src/middleware.ts`、認証/redirect helper、環境テンプレート、README。`workers_dev=false`、`preview_urls=false`、`keep_vars=true`、`nodejs_compat`、Custom Domain固定を設定。`keep_vars=true`によりWrangler再デプロイでDashboard管理のruntime Variablesを消さない。
+- **追加防御**: `AUTH_MODE=cloudflare`では`APP_ORIGIN=https://invitation-event-calendar.amida-solution.uk`とrequest originの完全一致を必須にし、Vercel URL、workers.dev、Preview URL、任意Hostからは公開パスを含め403。redirect先はHostヘッダーではなく設定済みoriginから作る。
+- **検証済み**: `npm test` 13件、`npm run lint`、`npm run build`、`npm run build:worker`、`git diff --check`。workerd local previewで想定Hostの`/login=200`、JWTなしの`/events`・`/availability`・`/auth/cloudflare`・未定義API=403、不正Host=403。
+- **Secret判断**: Service Role KeyはRLSを迂回できるためruntime Workers Secretだけに置く。現行OpenNext buildは不要なのでBuild環境へ複製しない。将来buildで必要になった場合だけ、平文VariableではなくBuild Secretとして設定する。
+- **未確認**: 実Cloudflare Access JWTの透過、allowlist後のSupabase Set-Cookieの実ドメイン永続化、logout、JWKSネットワーク取得、Workers Buildsのruntime/build variables、Custom Domain/DNS、Access Policy。これらを通すまで本番デプロイしない。
+
+### Cloudflare Access認証・認可（未コミット）
+
+- **変更理由**: `AUTH_MODE=local` だけを信用すると、productionや非loopbackのSupabaseでもCloudflare境界を迂回できた。JWTの時刻claimは任意であり、prefix判定の公開パスは`/login-evil`まで公開扱いになり得た。
+- **実装**: local modeは「developmentかつloopback Supabase」に限定。未知の認証モードはfail closed。Cloudflare JWTはRS256、JWKS、issuer、audience、必須の`exp`/`nbf`を検証する。公開パスは完全一致または安全な境界で判定し、SupabaseのsignOut後は検証済みteam domainのCloudflare logoutへ遷移する（localは`/login`）。
+- **認可順序**: 検証済みJWTのemailをtrim+lowercaseし、`allowed_emails.is_enabled=true`をサービスロールで照合してからのみ`generateLink`する。未許可・無効・照合エラーでは、auth user作成、プロフィール・初期プリセット作成、Supabase session発行、データ取得を開始しない。
+- **検証済み**: `npm test` 11件（正常JWT/メール正規化、欠損・偽造・ES256、issuer/audience、exp/nbf、JWKS鍵ローテーション、安全なnext、既存user ID再利用、local設定、allowlist→generateLinkの順序と未許可時0回）、`npm run lint`、`npm run build` が成功。
+- **残課題**: 公開SupabaseのData APIはCloudflare gatewayの外にある。RLSでanon・未許可ユーザーは拒否するが、この通信経路自体を非公開にするには将来BFF化またはSupabaseの非公開化が必要。
+- **Policy簡略化の確定事項**: Cloudflare Access Policyは `Allow` + `Include: Everyone` + `Require: Login Methods → Google`、ApplicationのIdPはGoogleのみ、Instant authenticationは有効。`Include` にEveryoneとGoogleを併記しない。個別メールの正本は`public.allowed_emails`。
+
+### ローカルSupabase fixture（コミット済み）
+
+- **目的**: 本番Supabaseを汚さず、複数メンバーの空き時間・権限UIを検証する。
+- **構成**: `npm run dev:local` がローカルSupabaseを起動して `.env.local` をローカル接続に切替える。fixture投入は意図的に手動であり、通常起動や`db reset`では自動投入しない。
+- **データ**: `supabase/local/fixture.sql` が Alice / Bob / Cara の認証ユーザー、許可メール、プロフィール、各3件の空き時間を用意する。cleanupもfixture固有IDだけを対象にする。
+- **注意**: 画面ログインにはローカルのメール/パスワード画面を使う。リモート環境ではCloudflare Accessのみを使う。fixtureのメール・パスワード・投入/削除手順は `supabase/local/README.md` を参照。
 
 ## 設計メモ・ハマりどころ
 
-- **Next.js 16の破壊的変更**: `middleware.ts` は廃止され `proxy.ts`（`export function proxy`）に名称変更。他ツールが古い知識で `middleware.ts` を生成すると効かないので注意。`node_modules/next/dist/docs/` に同梱ドキュメントがあるので破壊的変更の確認に使える。
+- **Next.js 16とWorkersの例外**: 通常のNext 16では`middleware.ts`は`proxy.ts`（`export function proxy`）へ改称された。ただし現行OpenNext WorkersはNode.js Proxyを未対応。このためWorkers移行では、認証ゲートを安易に書き換えず、Edge互換legacy `middleware.ts`として動かせるかをWorker previewで確認してから切替える（現在は未実装）。`node_modules/next/dist/docs/` とOpenNext公式ドキュメントを根拠に判断する。
 - **`src/lib/database.types.ts`は手書き**。スキーマを変更したら手動で追従するか `supabase gen types typescript` で再生成すること。各テーブルに `Relationships: []` を書き忘れると `Database["public"]` がpostgrest-jsの `GenericSchema` 制約を満たせず、`.from()`/`.rpc()` の引数型が黙って `never`/`undefined` に壊れる（一度ハマった箇所、ファイル内コメント参照）。
 - **`set_availability` RPCが空き時間変更とマージ/分割正規化の唯一の経路**。`availability_slots` のクライアントからの直接書き込み権限は剥奪済みで、RPC側で許可済みユーザー・本人・JSTの登録可能期間を検証する。
 - **ESLintの `react-hooks/set-state-in-effect`**: React 19/Next16のリンタがdata-fetching effectパターンにも反応する。`availability-board.tsx` の一箇所のみ理由コメント付きで意図的にdisable。同種のケースが増える場合はSWR/React Query導入も検討（現状の技術スタックには未採用）。
