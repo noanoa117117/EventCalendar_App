@@ -35,20 +35,36 @@ export function isConfigured(): boolean {
   return getConfig() !== null;
 }
 
+async function parseTokenError(res: Response): Promise<string> {
+  try {
+    const text = await res.text();
+    const json = JSON.parse(text) as { error?: unknown; error_description?: unknown };
+    const error = typeof json.error === "string" ? json.error.slice(0, 100) : "";
+    const desc = typeof json.error_description === "string" ? json.error_description.slice(0, 400) : "";
+    if (error) {
+      return `Token exchange failed: ${res.status} ${error}${desc ? `: ${desc}` : ""}`;
+    }
+    return `Token exchange failed: ${res.status} ${text.slice(0, 500).replace(/[^\x20-\x7E]/g, "")}`;
+  } catch {
+    return `Token exchange failed: ${res.status}`;
+  }
+}
+
 export async function getAccessToken(creds: ServiceAccountCredentials): Promise<string> {
   if (tokenCache && tokenCache.expiresAt > Date.now() + 60_000) {
     return tokenCache.token;
   }
 
   const key = await importPKCS8(creds.private_key, "RS256");
+  const now = Math.floor(Date.now() / 1000);
   const jwt = await new SignJWT({
     scope: "https://www.googleapis.com/auth/calendar.events",
   })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(creds.client_email)
     .setAudience("https://oauth2.googleapis.com/token")
-    .setIssuedAt()
-    .setExpirationTime("1h")
+    .setIssuedAt(now)
+    .setExpirationTime(now + 3600)
     .sign(key);
 
   const res = await fetch("https://oauth2.googleapis.com/token", {
@@ -61,7 +77,7 @@ export async function getAccessToken(creds: ServiceAccountCredentials): Promise<
   });
 
   if (!res.ok) {
-    throw new Error(`Token exchange failed: ${res.status}`);
+    throw new Error(await parseTokenError(res));
   }
 
   const data = (await res.json()) as { access_token: string; expires_in: number };

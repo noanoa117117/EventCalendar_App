@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import { before, afterEach, test } from "node:test";
-import { generateKeyPair, exportPKCS8 } from "jose";
+import { generateKeyPair, exportPKCS8, decodeJwt, decodeProtectedHeader } from "jose";
 import {
   appEventIdToGoogleId,
   toGoogleEvent,
@@ -113,6 +113,68 @@ test("getAccessToken throws on failed token exchange", async () => {
     () => getAccessToken({ client_email: "a@b.com", private_key: privateKeyPem }),
     { message: /Token exchange failed: 400/ },
   );
+});
+
+test("getAccessToken extracts error and error_description from JSON response", async () => {
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({ error: "invalid_grant", error_description: "Invalid JWT Signature." }),
+      { status: 400 },
+    );
+  await assert.rejects(
+    () => getAccessToken({ client_email: "a@b.com", private_key: privateKeyPem }),
+    { message: "Token exchange failed: 400 invalid_grant: Invalid JWT Signature." },
+  );
+});
+
+test("getAccessToken error message does not contain secrets", async () => {
+  globalThis.fetch = async () =>
+    new Response(
+      JSON.stringify({ error: "invalid_grant", error_description: "fail" }),
+      { status: 400 },
+    );
+  try {
+    await getAccessToken({ client_email: "secret@proj.iam.gserviceaccount.com", private_key: privateKeyPem });
+    assert.fail("should have thrown");
+  } catch (e) {
+    const msg = (e as Error).message;
+    assert.ok(!msg.includes(privateKeyPem.slice(28, 80)), "must not contain private key");
+    assert.ok(!msg.includes("secret@proj.iam"), "must not contain client_email");
+  }
+});
+
+test("JWT assertion has correct claims and header per Google spec", async () => {
+  let capturedAssertion = "";
+  globalThis.fetch = async (_input: string | URL | Request, init?: RequestInit) => {
+    const body = init?.body;
+    if (body instanceof URLSearchParams) {
+      capturedAssertion = body.get("assertion") ?? "";
+      assert.equal(body.get("grant_type"), "urn:ietf:params:oauth:2.0:jwt-bearer");
+    }
+    return new Response(JSON.stringify({ access_token: "tok", expires_in: 3600 }));
+  };
+
+  await getAccessToken({
+    client_email: "test@project.iam.gserviceaccount.com",
+    private_key: privateKeyPem,
+  });
+
+  assert.ok(capturedAssertion, "assertion must be captured");
+
+  const header = decodeProtectedHeader(capturedAssertion);
+  assert.equal(header.alg, "RS256");
+  assert.equal(header.typ, "JWT");
+
+  const payload = decodeJwt(capturedAssertion);
+  assert.equal(payload.iss, "test@project.iam.gserviceaccount.com");
+  assert.equal(payload.aud, "https://oauth2.googleapis.com/token");
+  assert.equal((payload as Record<string, unknown>).scope, "https://www.googleapis.com/auth/calendar.events");
+
+  const now = Math.floor(Date.now() / 1000);
+  assert.ok(typeof payload.iat === "number" && Math.abs(payload.iat - now) < 5, "iat must be Unix seconds");
+  assert.ok(typeof payload.exp === "number" && payload.exp - payload.iat! === 3600, "exp must be iat + 3600");
+  assert.equal(payload.sub, undefined, "sub must not be set");
+  assert.equal(payload.nbf, undefined, "nbf must not be set");
 });
 
 // --- upsert (create + 409 → PATCH) ---
