@@ -3,10 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "npm run dev:local",
+    "dev:local": "SUPABASE_TELEMETRY_DISABLED=1 npx --no-install supabase start && npm run env:local && next dev",
+    "dev:remote": "npm run env:remote && next dev",
+    "env:local": "SUPABASE_TELEMETRY_DISABLED=1 node scripts/supabase-env.mjs local",
+    "env:remote": "SUPABASE_TELEMETRY_DISABLED=1 node scripts/supabase-env.mjs remote",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "supabase:status": "SUPABASE_TELEMETRY_DISABLED=1 npx --no-install supabase status"
   },
   "dependencies": {
     "@base-ui/react": "^1.7.0",
@@ -33,6 +38,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
+    "supabase": "2.111.0",
     "tailwindcss": "^4",
     "typescript": "^5"
   }
