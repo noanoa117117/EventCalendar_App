@@ -14,12 +14,14 @@ export function PresetPanel({
   activePresetId,
   onActivate,
   onPresetsChange,
+  preview = false,
 }: {
   userId: string;
   presets: Preset[];
   activePresetId: string | null;
   onActivate: (id: string | null) => void;
   onPresetsChange: (presets: Preset[]) => void;
+  preview?: boolean;
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Preset | null>(null);
@@ -106,6 +108,7 @@ export function PresetPanel({
         nextSortOrder={presets.length}
         onSaved={handleSaved}
         onDeleted={handleDeleted}
+        preview={preview}
       />
     </div>
   );

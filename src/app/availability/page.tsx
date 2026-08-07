@@ -1,8 +1,13 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { getDevAvailabilityData, isDevPreviewEnabled } from "@/lib/dev-auth";
 import { AvailabilityBoard } from "./_components/availability-board";
 
 export default async function AvailabilityPage() {
+  if (isDevPreviewEnabled()) {
+    const data = getDevAvailabilityData();
+    return <AvailabilityBoard {...data} preview />;
+  }
   const supabase = await createClient();
   const {
     data: { user },

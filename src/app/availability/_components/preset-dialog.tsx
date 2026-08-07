@@ -36,6 +36,7 @@ export function PresetDialog({
   nextSortOrder,
   onSaved,
   onDeleted,
+  preview = false,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -44,6 +45,7 @@ export function PresetDialog({
   nextSortOrder: number;
   onSaved: (preset: Preset) => void;
   onDeleted: (id: string) => void;
+  preview?: boolean;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -65,6 +67,7 @@ export function PresetDialog({
               onDeleted(id);
               onOpenChange(false);
             }}
+            preview={preview}
           />
         )}
       </DialogContent>
@@ -78,12 +81,14 @@ function PresetForm({
   nextSortOrder,
   onSaved,
   onDeleted,
+  preview,
 }: {
   userId: string;
   preset: Preset | null;
   nextSortOrder: number;
   onSaved: (preset: Preset) => void;
   onDeleted: (id: string) => void;
+  preview?: boolean;
 }) {
   const initialMidnight = preset ? preset.end_time.slice(0, 5) === "00:00" : false;
 
@@ -112,6 +117,11 @@ function PresetForm({
 
     setSaving(true);
     setError(null);
+    if (preview) {
+      onSaved({ id: preset?.id ?? `preview-preset-${Date.now()}`, user_id: userId, label: trimmed, start_time: startTime, end_time: end, color, sort_order: preset?.sort_order ?? nextSortOrder });
+      setSaving(false);
+      return;
+    }
     const supabase = createClient();
 
     if (preset) {
@@ -152,6 +162,7 @@ function PresetForm({
   async function handleDelete() {
     if (!preset) return;
     setSaving(true);
+    if (preview) { onDeleted(preset.id); setSaving(false); return; }
     const supabase = createClient();
     const { error } = await supabase
       .from("availability_presets")

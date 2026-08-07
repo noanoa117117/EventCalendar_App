@@ -45,33 +45,47 @@ export function MonthCalendar({
   }, [slots]);
 
   const [dragging, setDragging] = useState(false);
-  const [anchorAction, setAnchorAction] = useState<"apply" | "remove" | null>(null);
   const [visited, setVisited] = useState<Set<string>>(new Set());
   const draggingRef = useRef(false);
+  const visitedRef = useRef(new Set<string>());
+  const actionRef = useRef<"apply" | "remove" | null>(null);
+  const presetRef = useRef(activePreset);
+  useEffect(() => { presetRef.current = activePreset; }, [activePreset]);
 
   useEffect(() => {
-    function finish() {
+    function finish(cancel = false) {
       if (!draggingRef.current) return;
       draggingRef.current = false;
       setDragging(false);
-      if (activePreset && anchorAction && visited.size > 0) {
-        onPaint(Array.from(visited), anchorAction, activePreset);
+      if (!cancel && presetRef.current && actionRef.current && visitedRef.current.size > 0) {
+        onPaint(Array.from(visitedRef.current), actionRef.current, presetRef.current);
       }
+      visitedRef.current = new Set();
       setVisited(new Set());
-      setAnchorAction(null);
     }
-    window.addEventListener("pointerup", finish);
-    return () => window.removeEventListener("pointerup", finish);
+    function move(e: PointerEvent) {
+      if (!draggingRef.current) return;
+      e.preventDefault();
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const date = el?.closest<HTMLElement>("[data-date]")?.dataset.date;
+      if (date) handlePointerEnter(date);
+    }
+    const onUp = () => finish();
+    const onCancel = () => finish(true);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("pointermove", move, { passive: false });
+    return () => { window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onCancel); window.removeEventListener("pointermove", move); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visited, anchorAction, activePreset]);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && draggingRef.current) {
         draggingRef.current = false;
+        visitedRef.current = new Set();
         setDragging(false);
         setVisited(new Set());
-        setAnchorAction(null);
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -88,17 +102,22 @@ export function MonthCalendar({
     return isRangeCovered(daySlots, activePreset.start_time, activePreset.end_time);
   }
 
-  function handlePointerDown(dateStr: string) {
+  function handlePointerDown(dateStr: string, e?: React.PointerEvent) {
     if (!activePreset || !isEditable(dateStr)) return;
+    e?.preventDefault();
     draggingRef.current = true;
     setDragging(true);
     const applied = isAppliedByActivePreset(dateStr);
-    setAnchorAction(applied ? "remove" : "apply");
-    setVisited(new Set([dateStr]));
+    actionRef.current = applied ? "remove" : "apply";
+    visitedRef.current = new Set([dateStr]);
+    setVisited(visitedRef.current);
   }
 
   function handlePointerEnter(dateStr: string) {
-    if (!draggingRef.current || !activePreset || !isEditable(dateStr)) return;
+    if (!draggingRef.current || !presetRef.current || !isEditable(dateStr)) return;
+    visitedRef.current = new Set(visitedRef.current);
+    if (visitedRef.current.has(dateStr)) return;
+    visitedRef.current.add(dateStr);
     setVisited((prev) => {
       if (prev.has(dateStr)) return prev;
       const next = new Set(prev);
@@ -132,25 +151,17 @@ export function MonthCalendar({
           return (
             <div
               key={dateStr}
-              onPointerDown={() => handlePointerDown(dateStr)}
+              data-date={dateStr}
+              onPointerDown={(e) => handlePointerDown(dateStr, e)}
               onPointerEnter={() => handlePointerEnter(dateStr)}
               className={cn(
                 "flex select-none flex-col gap-1 border-b border-r p-1.5 text-left align-top",
                 !inMonth && "bg-muted/30",
                 editable && activePreset && "cursor-pointer",
                 !editable && "bg-muted/50",
+                dragging && "touch-none",
               )}
-              style={
-                isVisitedNow
-                  ? {
-                      backgroundColor: activePreset
-                        ? `${activePreset.color}55`
-                        : undefined,
-                    }
-                  : applied
-                    ? { backgroundColor: `${activePreset?.color}2a` }
-                    : undefined
-              }
+              style={{ touchAction: activePreset && editable ? "none" : "auto", ...(isVisitedNow ? { backgroundColor: activePreset ? `${activePreset.color}55` : undefined } : applied ? { backgroundColor: `${activePreset?.color}2a` } : {}) }}
             >
               <span
                 className={cn(

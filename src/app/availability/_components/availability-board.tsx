@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { addMonths, addWeeks, format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -24,10 +25,14 @@ export function AvailabilityBoard({
   currentUser,
   members,
   initialPresets,
+  initialSlots = [],
+  preview = false,
 }: {
   currentUser: Profile;
   members: Profile[];
   initialPresets: Preset[];
+  initialSlots?: Slot[];
+  preview?: boolean;
 }) {
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [cursorDate, setCursorDate] = useState<Date>(() => jstNow());
@@ -36,8 +41,9 @@ export function AvailabilityBoard({
   );
   const [presets, setPresets] = useState<Preset[]>(initialPresets);
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
-  const [slots, setSlots] = useState<Slot[]>([]);
+  const [slots, setSlots] = useState<Slot[]>(initialSlots);
   const [loading, setLoading] = useState(false);
+  const fetchGeneration = useRef(0);
 
   const editableWindow = useMemo(() => registrableWindow(), []);
   const activePreset = presets.find((p) => p.id === activePresetId) ?? null;
@@ -48,6 +54,8 @@ export function AvailabilityBoard({
   );
 
   const fetchSlots = useCallback(async () => {
+    if (preview) return;
+    const generation = ++fetchGeneration.current;
     if (visibleIds.size === 0) {
       setSlots([]);
       return;
@@ -60,13 +68,14 @@ export function AvailabilityBoard({
       .in("user_id", Array.from(visibleIds))
       .gte("date", format(range.start, "yyyy-MM-dd"))
       .lte("date", format(range.end, "yyyy-MM-dd"));
+    if (generation !== fetchGeneration.current) return;
     setLoading(false);
     if (error) {
       toast.error("空き時間の取得に失敗しました。");
       return;
     }
     setSlots(data ?? []);
-  }, [visibleIds, range]);
+  }, [visibleIds, range, preview]);
 
   useEffect(() => {
     // Sync with Supabase (an external system) whenever the visible
@@ -96,6 +105,12 @@ export function AvailabilityBoard({
   }
 
   async function handlePaint(dates: string[], action: "apply" | "remove", preset: Preset) {
+    if (preview) {
+      setSlots((prev) => action === "apply"
+        ? [...prev.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.preset_id === preset.id)), ...dates.map((date, i) => ({ id: `preview-${Date.now()}-${i}`, user_id: currentUser.id, date, start_time: preset.start_time, end_time: preset.end_time, preset_id: preset.id }))]
+        : prev.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.start_time === preset.start_time && s.end_time === preset.end_time)));
+      return;
+    }
     const supabase = createClient();
     const { error } = await supabase.rpc("set_availability", {
       p_dates: dates,
@@ -117,6 +132,12 @@ export function AvailabilityBoard({
     end: string,
     action: "apply" | "remove",
   ) {
+    if (preview) {
+      setSlots((prev) => action === "apply"
+        ? [...prev.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end)), { id: `preview-${Date.now()}`, user_id: currentUser.id, date, start_time: start, end_time: end, preset_id: null }]
+        : prev.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end)));
+      return;
+    }
     const supabase = createClient();
     const { error } = await supabase.rpc("set_availability", {
       p_dates: [date],
@@ -147,9 +168,18 @@ export function AvailabilityBoard({
       ? format(cursorDate, "yyyy年M月", { locale: ja })
       : `${format(range.start, "M/d", { locale: ja })} - ${format(range.end, "M/d", { locale: ja })}`;
 
+  const [mobilePanel, setMobilePanel] = useState<"calendar" | "members" | "presets">("calendar");
   return (
-    <div className="grid h-dvh grid-cols-[200px_1fr_260px] gap-px bg-border">
-      <aside className="overflow-y-auto bg-background p-4">
+    <div className="flex h-dvh flex-col bg-border">
+      {preview && <div className="bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-800">ローカルモック（Supabaseには接続しません）</div>}
+      <div className="flex items-center border-b bg-background px-3 py-2 md:hidden">
+        <Link href="/events" className="mr-2"><Button size="icon" variant="ghost" aria-label="イベントカレンダーへ戻る"><ArrowLeft className="h-4 w-4" /></Button></Link>
+        <Tabs value={mobilePanel} onValueChange={(v) => setMobilePanel(v as typeof mobilePanel)} className="flex-1">
+          <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger><TabsTrigger value="presets">プリセット</TabsTrigger></TabsList>
+        </Tabs>
+      </div>
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-px bg-border md:grid-cols-[200px_1fr_260px]">
+      <aside className={`${mobilePanel === "members" ? "" : "hidden"} overflow-y-auto bg-background p-4 md:block`}>
         <MemberList
           members={members}
           currentUserId={currentUser.id}
@@ -158,9 +188,10 @@ export function AvailabilityBoard({
         />
       </aside>
 
-      <main className="flex flex-col overflow-hidden bg-background">
+      <main className={`${mobilePanel === "calendar" ? "" : "hidden"} flex min-w-0 flex-col overflow-hidden bg-background md:flex`}>
         <div className="flex items-center justify-between gap-3 border-b p-3">
           <div className="flex items-center gap-1">
+            <Link href="/events" className="mr-1 hidden md:block"><Button size="icon" variant="ghost" aria-label="イベントカレンダーへ戻る"><ArrowLeft className="h-4 w-4" /></Button></Link>
             <Button size="icon" variant="ghost" onClick={goPrev} aria-label="前へ">
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -222,15 +253,17 @@ export function AvailabilityBoard({
         </div>
       </main>
 
-      <aside className="overflow-y-auto bg-background p-4">
+      <aside className={`${mobilePanel === "presets" ? "" : "hidden"} overflow-y-auto bg-background p-4 md:block`}>
         <PresetPanel
           userId={currentUser.id}
           presets={presets}
           activePresetId={activePresetId}
           onActivate={setActivePresetId}
           onPresetsChange={setPresets}
+          preview={preview}
         />
       </aside>
+      </div>
     </div>
   );
 }

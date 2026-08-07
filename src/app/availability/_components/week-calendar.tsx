@@ -59,9 +59,11 @@ export function WeekCalendar({
   }, [slots]);
 
   const [dragDate, setDragDate] = useState<string | null>(null);
-  const [dragAction, setDragAction] = useState<"apply" | "remove" | null>(null);
   const [dragRows, setDragRows] = useState<[number, number] | null>(null);
   const draggingRef = useRef(false);
+  const dragDateRef = useRef<string | null>(null);
+  const dragActionRef = useRef<"apply" | "remove" | null>(null);
+  const dragRowsRef = useRef<[number, number] | null>(null);
 
   function isEditable(dateStr: string) {
     return isDateEditable(dateStr, editableWindow);
@@ -75,41 +77,56 @@ export function WeekCalendar({
   function handleDown(dateStr: string, row: number) {
     if (!isEditable(dateStr)) return;
     draggingRef.current = true;
+    dragDateRef.current = dateStr;
+    dragActionRef.current = isOwnRowCovered(dateStr, row) ? "remove" : "apply";
+    dragRowsRef.current = [row, row];
     setDragDate(dateStr);
-    setDragAction(isOwnRowCovered(dateStr, row) ? "remove" : "apply");
     setDragRows([row, row]);
   }
 
   function handleEnter(dateStr: string, row: number) {
-    if (!draggingRef.current || dateStr !== dragDate) return;
-    setDragRows((prev) => (prev ? [Math.min(prev[0], row), Math.max(prev[1], row)] : [row, row]));
+    if (!draggingRef.current || dateStr !== dragDateRef.current) return;
+    const next: [number, number] = dragRowsRef.current ? [Math.min(dragRowsRef.current[0], row), Math.max(dragRowsRef.current[1], row)] : [row, row];
+    dragRowsRef.current = next;
+    setDragRows(next);
   }
 
   useEffect(() => {
-    function finish() {
+    function finish(cancel = false) {
       if (!draggingRef.current) return;
       draggingRef.current = false;
-      if (dragDate && dragAction && dragRows) {
-        const start = minutesToTime(dragRows[0] * 30);
-        const end = minutesToTime((dragRows[1] + 1) * 30);
-        onDragCommit(dragDate, start, end, dragAction);
+      if (!cancel && dragDateRef.current && dragActionRef.current && dragRowsRef.current) {
+        const start = minutesToTime(dragRowsRef.current[0] * 30);
+        const end = minutesToTime((dragRowsRef.current[1] + 1) * 30);
+        onDragCommit(dragDateRef.current, start, end, dragActionRef.current);
       }
+      dragDateRef.current = null; dragActionRef.current = null; dragRowsRef.current = null;
       setDragDate(null);
-      setDragAction(null);
       setDragRows(null);
     }
-    window.addEventListener("pointerup", finish);
-    return () => window.removeEventListener("pointerup", finish);
+    function move(e: PointerEvent) {
+      if (!draggingRef.current) return;
+      e.preventDefault();
+      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
+      const cell = el?.closest<HTMLElement>("[data-week-date][data-week-row]");
+      if (cell?.dataset.weekDate && cell.dataset.weekRow) handleEnter(cell.dataset.weekDate, Number(cell.dataset.weekRow));
+    }
+    const onUp = () => finish();
+    const onCancel = () => finish(true);
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("pointermove", move, { passive: false });
+    return () => { window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onCancel); window.removeEventListener("pointermove", move); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dragDate, dragAction, dragRows]);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && draggingRef.current) {
         draggingRef.current = false;
         setDragDate(null);
-        setDragAction(null);
         setDragRows(null);
+        dragDateRef.current = null; dragActionRef.current = null; dragRowsRef.current = null;
       }
     }
     window.addEventListener("keydown", onKeyDown);
@@ -120,9 +137,10 @@ export function WeekCalendar({
 
   return (
     <div className="flex h-full flex-col overflow-auto">
+      <div className="min-w-[760px]">
       <div
         className="grid border-b text-center text-xs font-medium text-muted-foreground"
-        style={{ gridTemplateColumns: `3rem repeat(7, 1fr)` }}
+        style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}
       >
         <div />
         {days.map((day) => {
@@ -136,10 +154,10 @@ export function WeekCalendar({
         })}
       </div>
 
-      <div className="grid flex-1" style={{ gridTemplateColumns: `3rem repeat(7, 1fr)` }}>
+      <div className="grid flex-1" style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}>
         <div className="text-right">
           {Array.from({ length: ROWS }, (_, row) => (
-            <div key={row} className="h-4 pr-1 text-[10px] leading-4 text-muted-foreground">
+            <div key={row} className="h-11 pr-1 text-[10px] leading-[2.75rem] text-muted-foreground">
               {row % 4 === 0 ? `${String(row / 2).padStart(2, "0")}:00` : ""}
             </div>
           ))}
@@ -167,10 +185,12 @@ export function WeekCalendar({
                     return (
                       <div
                         key={row}
+                        data-week-date={dateStr}
+                        data-week-row={row}
                         onPointerDown={() => isOwn && handleDown(dateStr, row)}
                         onPointerEnter={() => isOwn && handleEnter(dateStr, row)}
                         className={cn(
-                          "h-4 border-b border-r border-dashed border-muted-foreground/10",
+                          "h-11 border-b border-r border-dashed border-muted-foreground/10 touch-none",
                           row % 4 === 0 && "border-t border-solid border-muted-foreground/20",
                           isOwn && editable && "cursor-pointer",
                           !editable && isOwn && "bg-muted/40",
@@ -190,6 +210,7 @@ export function WeekCalendar({
             </div>
           );
         })}
+      </div>
       </div>
     </div>
   );

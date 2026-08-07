@@ -5,9 +5,9 @@
 
 ## 現在のフェーズ
 
-**Phase 1-2: 実装・ビルド確認まで完了。実Supabase環境への適用はまだ（ユーザー側作業、下記TODO）。**
+**Phase 1-3: 実装・ビルド確認まで完了。実Supabase環境への適用はまだ（ユーザー側作業、下記TODO）。**
 
-## Done（Phase 1-2 実装）
+## Done（Phase 1-3 実装）
 
 - [x] Next.js 16 (App Router) + TypeScript + Tailwind v4 + shadcn/ui scaffold
 - [x] Supabaseクライアント（browser/server）+ `src/proxy.ts`（認証・ホワイトリスト・ニックネーム未設定のリダイレクトゲート）
@@ -23,18 +23,33 @@
   - 過去日・登録可能期間（当月+3ヶ月）外は編集不可
   - プリセット追加/編集/削除（削除しても既存の空き時間は変更しない）
 - [x] `npm run build`（型チェック・ESLint込み）通過、`npm run dev` でのスモークテスト確認済み（ログイン画面・アクセス拒否画面のレンダリング）
+- [x] Phase 1-2の追加セキュリティ・整合性修正
+  - `allowed_emails` はクライアントから参照不可とし、ログインゲートは真偽値だけを返すRPCで判定
+  - 空き時間の更新をユーザー・日付ごとに直列化し、同時更新でも正規化を維持
+  - 登録可能期間の上限を、閲覧端末のタイムゾーンに関係なくJSTで算出
+- [x] Phase 3（画面①）: 共有イベントカレンダー
+  - ログイン後のデフォルト画面を月／週表示のイベントカレンダーに変更
+  - イベント作成・詳細表示・作成者による編集／キャンセル
+  - 参加／未定／不参加の参加表明（イベント作成時の参加者自動登録なし）
+- [x] ローカル認証なしプレビュー
+  - `.env.local` の `DEV_BYPASS_AUTH=true` で、開発サーバーだけがサンプルデータのイベントカレンダーを表示
+  - 操作結果はブラウザ内のみで、Supabase・RLS・production認証には影響しない
+- [x] 操作性・モバイル対応の先行修正
+  - イベント編集、主催者表示、参加状態のグループ表示、画面①↔②ナビゲーション
+  - モバイルのイベント詳細ボトムシート、空き時間画面のカレンダー／メンバー／プリセット切替
+  - 空き時間ペイントのタッチドラッグ・中断・高速操作、および週表示の指で押せる行高
+  - 開発プレビューでイベント画面と空き時間画面の両方を確認可能
 
 ## TODO（ユーザー側の環境構築作業）
 
-- [ ] 実Supabaseプロジェクトを作成し `supabase/migrations/` 配下の全SQLを番号順に適用
-- [ ] `supabase/seed.sql` のメールアドレスを自分のものに書き換えて実行（ホワイトリスト登録）
-- [ ] Google Cloud ConsoleでOAuthクライアント作成 → SupabaseのGoogle Provider設定
-- [ ] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
-- [ ] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD
+- [x] 実Supabaseプロジェクトを作成し `supabase/migrations/` 配下の全SQL（現在は`0001`〜`0003`）を番号順に適用
+- [x] `supabase/seed.sql` のメールアドレスを自分のものに書き換えて実行（ホワイトリスト登録）
+- [x] Google Cloud ConsoleでOAuthクライアント作成 → SupabaseのGoogle Provider設定
+- [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
+- [] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
 
 ## 次のフェーズ（未着手）
 
-- **Phase 3**: 画面①（共有イベントカレンダー）+ イベントへの参加表明。`events` / `event_participants` テーブルは作成済みだがUIは未実装。
 - **Phase 4**: 画面③（イベント企画）+ 共通空き時間のヒートマップ算出・イベント作成フォーム。
 - **Phase 5**: 3ペイン統合レイアウト・モバイル下部タブ・レスポンシブ対応（Phase1-2はデスクトップ操作優先で未対応）。
 
@@ -44,3 +59,4 @@
 - **`src/lib/database.types.ts`は手書き**。スキーマを変更したら手動で追従するか `supabase gen types typescript` で再生成すること。各テーブルに `Relationships: []` を書き忘れると `Database["public"]` がpostgrest-jsの `GenericSchema` 制約を満たせず、`.from()`/`.rpc()` の引数型が黙って `never`/`undefined` に壊れる（一度ハマった箇所、ファイル内コメント参照）。
 - **`set_availability` RPCが空き時間変更とマージ/分割正規化の唯一の経路**。`availability_slots` のクライアントからの直接書き込み権限は剥奪済みで、RPC側で許可済みユーザー・本人・JSTの登録可能期間を検証する。
 - **ESLintの `react-hooks/set-state-in-effect`**: React 19/Next16のリンタがdata-fetching effectパターンにも反応する。`availability-board.tsx` の一箇所のみ理由コメント付きで意図的にdisable。同種のケースが増える場合はSWR/React Query導入も検討（現状の技術スタックには未採用）。
+- **開発時の認証バイパス**: `src/lib/dev-auth.ts` は `NODE_ENV === "development"` と `DEV_BYPASS_AUTH === "true"` の両方が揃う場合だけ有効。実DBを使うE2Eではこのフラグを使わず、Googleテストアカウントをホワイトリストに登録して確認する。

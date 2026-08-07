@@ -1,6 +1,5 @@
 import {
   addDays,
-  addMonths,
   endOfMonth,
   endOfWeek,
   startOfMonth,
@@ -23,11 +22,15 @@ export function jstToday(): string {
 // Registrable window: today through the last day of (current month + 3
 // months), per REQUIREMENTS.md section 5.
 export function registrableWindow(): { min: string; max: string } {
-  const now = jstNow();
-  const max = endOfMonth(addMonths(now, 3));
+  const min = jstToday();
+  // Treat the Tokyo date as a calendar value. Constructing a local-midnight
+  // Date and then applying date-fns arithmetic can cross a day when the
+  // browser timezone is ahead of Tokyo.
+  const [year, month] = min.split("-").map(Number);
+  const max = new Date(Date.UTC(year, month - 1 + 4, 0));
   return {
-    min: jstToday(),
-    max: formatInTimeZone(max, APP_TIME_ZONE, "yyyy-MM-dd"),
+    min,
+    max: formatInTimeZone(max, "UTC", "yyyy-MM-dd"),
   };
 }
 

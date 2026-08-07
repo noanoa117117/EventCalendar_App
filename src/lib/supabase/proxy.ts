@@ -1,10 +1,22 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import type { Database } from "@/lib/database.types";
+import { isDevPreviewEnabled } from "@/lib/dev-auth";
 
 const PUBLIC_PATHS = ["/login", "/auth/callback", "/access-denied"];
 
 export async function updateSession(request: NextRequest) {
+  const { pathname } = request.nextUrl;
+  if (pathname === "/dev-preview") {
+    return NextResponse.next({ request });
+  }
+  if (isDevPreviewEnabled() && (pathname === "/" || pathname === "/events" || pathname === "/availability")) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/dev-preview";
+    if (pathname === "/availability") url.searchParams.set("preview", "availability");
+    return NextResponse.rewrite(url);
+  }
+
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient<Database>(
@@ -32,7 +44,6 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { pathname } = request.nextUrl;
   const isPublicPath = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
 
   if (!user) {
@@ -43,16 +54,11 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // Whitelist gate: a Supabase session can exist for any Google account,
-  // but only allowed_emails rows grant access to app data (RLS only lets a
-  // user read their own row here, see migrations).
-  const { data: allowed } = await supabase
-    .from("allowed_emails")
-    .select("is_enabled")
-    .eq("email", (user.email ?? "").trim().toLowerCase())
-    .maybeSingle();
+  // Whitelist gate: this RPC evaluates the current JWT in the database
+  // without exposing allowlist email addresses through the client API.
+  const { data: isAllowed } = await supabase.rpc("is_allowed_user");
 
-  if (!allowed?.is_enabled) {
+  if (!isAllowed) {
     if (pathname.startsWith("/access-denied")) return response;
     const url = request.nextUrl.clone();
     url.pathname = "/access-denied";
