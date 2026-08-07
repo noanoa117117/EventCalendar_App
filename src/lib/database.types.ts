@@ -179,6 +179,10 @@ export interface Database {
         Args: { p_email: string };
         Returns: Database["public"]["Tables"]["allowed_emails"]["Row"];
       };
+      delete_cancelled_event: {
+        Args: { p_event_id: string };
+        Returns: void;
+      };
     };
     Enums: Record<string, never>;
   };
