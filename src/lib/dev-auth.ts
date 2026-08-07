@@ -43,10 +43,25 @@ const previewSlots: Slot[] = [
   { id: "00000000-0000-4000-8000-000000000030", user_id: previewOtherUserId, date: "2026-08-12", start_time: "10:00", end_time: "11:00", preset_id: null },
 ];
 
+const previewPlanningSlots: Slot[] = [
+  ...previewSlots,
+  { id: "00000000-0000-4000-8000-000000000031", user_id: previewCurrentUser.id, date: "2026-08-12", start_time: "10:00", end_time: "12:00", preset_id: null },
+];
+
 export function getDevPreviewData() {
   return { currentUser: previewCurrentUser, people: previewPeople, events: previewEvents, participants: previewParticipants };
 }
 
 export function getDevAvailabilityData() {
   return { currentUser: previewCurrentUser, members: previewPeople, initialPresets: previewPresets, initialSlots: previewSlots };
+}
+
+export function getDevPlanningData() {
+  return { currentUser: previewCurrentUser, members: previewPeople, initialSlots: previewPlanningSlots };
+}
+
+export function addDevEvent(event: Omit<Event, "id" | "created_at">): Event {
+  const created: Event = { ...event, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+  previewEvents.push(created);
+  return created;
 }

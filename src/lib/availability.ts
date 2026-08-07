@@ -103,3 +103,16 @@ export function formatTimeLabel(time: string, isEnd = false) {
   if (isEnd && hhmm === "00:00") return "24:00";
   return hhmm;
 }
+
+/** Expand stored ranges into unique, half-open 30-minute cells in memory. */
+export function expandToSlots(ranges: TimeRange[]): string[] {
+  const cells = new Set<string>();
+  for (const range of ranges) {
+    const start = Math.max(0, startMinutes(range.start_time));
+    const end = Math.min(1440, endMinutes(range.end_time));
+    for (let minute = start; minute + 30 <= end; minute += 30) {
+      cells.add(minutesToTime(minute));
+    }
+  }
+  return Array.from(cells).sort();
+}

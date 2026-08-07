@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks } from "date-fns";
 import { ja } from "date-fns/locale";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
@@ -39,6 +39,18 @@ export function EventCalendar({ currentUser, initialEvents, initialParticipants,
     : eachDayOfInterval({ start: startOfWeek(cursor, { weekStartsOn: 1 }), end: endOfWeek(cursor, { weekStartsOn: 1 }) });
   const selected = panel.kind === "detail" ? panel.event : null;
   const selectedParticipants = selected ? participants.filter((p) => p.event_id === selected.id) : [];
+
+  useEffect(() => {
+    if (!preview) return;
+    try {
+      const local = JSON.parse(window.localStorage.getItem("eventcalendar-dev-events") ?? "[]") as Event[];
+      // Local preview persistence is an external browser storage subscription.
+      if (local.length) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
+        setEvents((old) => [...old, ...local.filter((event) => !old.some((item) => item.id === event.id))]);
+      }
+    } catch { /* ignore malformed local preview data */ }
+  }, [preview]);
 
   async function respond(status: EventParticipantStatus) {
     if (!selected) return;
@@ -97,7 +109,7 @@ export function EventCalendar({ currentUser, initialEvents, initialParticipants,
   return <main className="min-h-dvh bg-muted/20">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 md:px-8">
       <div className="flex items-center gap-2"><CalendarDays className="size-5" /><h1 className="text-lg font-semibold">イベントカレンダー</h1><span className="text-sm text-muted-foreground">{currentUser.nickname}</span></div>
-      <div className="flex items-center gap-2"><Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き状況</Link>{preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}<Button size="sm" onClick={() => setPanel({ kind: "form", event: null })}><Plus /> イベント作成</Button>{!preview && <SignOutButton variant="ghost" />}</div>
+      <div className="flex items-center gap-2"><Link href="/planning" className="text-sm text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link><Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き状況</Link>{preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}<Button size="sm" onClick={() => setPanel({ kind: "form", event: null })}><Plus /> イベント作成</Button>{!preview && <SignOutButton variant="ghost" />}</div>
     </header>
     <div className="mx-auto grid max-w-7xl gap-4 p-4 md:grid-cols-[1fr_320px] md:p-8">
       <section className="overflow-hidden rounded-xl border bg-background">

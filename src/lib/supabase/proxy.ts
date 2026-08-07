@@ -10,10 +10,11 @@ export async function updateSession(request: NextRequest) {
   if (pathname === "/dev-preview") {
     return NextResponse.next({ request });
   }
-  if (isDevPreviewEnabled() && (pathname === "/" || pathname === "/events" || pathname === "/availability")) {
+  if (isDevPreviewEnabled() && (pathname === "/" || pathname === "/events" || pathname === "/availability" || pathname === "/planning")) {
     const url = request.nextUrl.clone();
     url.pathname = "/dev-preview";
     if (pathname === "/availability") url.searchParams.set("preview", "availability");
+    if (pathname === "/planning") url.searchParams.set("preview", "planning");
     return NextResponse.rewrite(url);
   }
 
