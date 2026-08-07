@@ -67,6 +67,7 @@ export function AvailabilityBoard({
     if (preview) return;
     const generation = ++fetchGeneration.current;
     if (visibleIds.size === 0) {
+      setLoading(false);
       replaceSlots([]);
       return;
     }
@@ -249,7 +250,7 @@ export function AvailabilityBoard({
           </div>
         )}
 
-        <div className="flex-1 overflow-hidden">
+        <div className="relative flex-1 overflow-hidden">
           {viewMode === "month" ? (
             <MonthCalendar
               cursorDate={cursorDate}
@@ -271,6 +272,19 @@ export function AvailabilityBoard({
               window={editableWindow}
               onDragCommit={handleWeekDragCommit}
             />
+          )}
+          {loading && (
+            <div
+              className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"
+              role="status"
+              aria-live="polite"
+              aria-label="空き時間を読み込み中"
+            >
+              <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm shadow-sm">
+                <span className="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" aria-hidden="true" />
+                空き時間を読み込み中…
+              </div>
+            </div>
           )}
         </div>
       </main>
