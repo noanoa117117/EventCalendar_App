@@ -179,9 +179,9 @@ function PresetForm({
   return (
     <form onSubmit={handleSubmit}>
       <DialogHeader>
-        <DialogTitle>{preset ? "プリセットを編集" : "プリセットを追加"}</DialogTitle>
+        <DialogTitle>{preset ? "空き時間パターンを編集" : "空き時間パターンを追加"}</DialogTitle>
         <DialogDescription>
-          30分単位の時間帯パターンです。すでに登録済みの空き時間には影響しません。
+          30分単位の時間帯パターンです。作成・編集後にパターンを選び、カレンダーの日付をクリック／ドラッグすると、あなたの空き時間として登録できます。すでに登録済みの空き時間には影響しません。
         </DialogDescription>
       </DialogHeader>
 

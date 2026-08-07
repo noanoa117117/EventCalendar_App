@@ -191,13 +191,13 @@ export function AvailabilityBoard({
     <div className={`flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col bg-border`}>
       {preview && !compact && <div className="bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-800">ローカルモック（Supabaseには接続しません）</div>}
       {!compact && <nav aria-label="メインナビゲーション" className="flex items-center gap-4 border-b bg-background px-4 py-2 text-sm">
-        <Link href="/events" className="text-muted-foreground underline-offset-4 hover:underline">イベント一覧</Link>
+        <Link href="/events" className="text-muted-foreground underline-offset-4 hover:underline">イベントカレンダー</Link>
         <Link href="/planning" className="text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link>
-        <span className="font-medium">空き状況</span>
+        <span className="font-medium">空き時間を登録・確認</span>
       </nav>}
       <div className={`flex items-center border-b bg-background px-3 py-2 ${compact ? "" : "md:hidden"}`}>
         <Tabs value={mobilePanel} onValueChange={(v) => setMobilePanel(v as typeof mobilePanel)} className="flex-1">
-          <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger><TabsTrigger value="presets">プリセット</TabsTrigger></TabsList>
+          <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger><TabsTrigger value="presets">空き時間パターン</TabsTrigger></TabsList>
         </Tabs>
       </div>
       <div className={`grid min-h-0 flex-1 grid-cols-1 gap-px bg-border ${compact ? "" : "md:grid-cols-[200px_1fr_260px]"}`}>
@@ -223,7 +223,7 @@ export function AvailabilityBoard({
             <Button variant="outline" size="sm" onClick={goToday}>
               今日
             </Button>
-            <h1 className="ml-2 text-sm font-semibold">{title}</h1>
+            <div className="ml-2"><h1 className="text-sm font-semibold">空き時間を登録・確認</h1><p className="text-xs text-muted-foreground">あなたの空き時間を登録し、選択したメンバーの空き時間を確認できます。</p><p className="text-xs text-muted-foreground">{title}</p></div>
             {loading && <span className="text-xs text-muted-foreground">更新中...</span>}
           </div>
           <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "week")}>
@@ -240,7 +240,7 @@ export function AvailabilityBoard({
             style={{ backgroundColor: `${activePreset.color}22` }}
           >
             <span>
-              「{activePreset.label}」を適用中 - 日付をクリック／ドラッグで登録・解除
+              「{activePreset.label}」を選択中。カレンダーの日付をクリック／ドラッグすると、あなたの空き時間を登録できます。同じ操作をもう一度すると解除します。
             </span>
             <Button size="sm" variant="ghost" onClick={() => setActivePresetId(null)}>
               <X className="mr-1 h-3.5 w-3.5" />

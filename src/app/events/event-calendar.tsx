@@ -12,7 +12,9 @@ import type { AllowedEmailRole, Database, EventParticipantStatus, EventStatus } 
 import type { Profile } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SignOutButton } from "@/components/sign-out-button";
+import { useRouter } from "next/navigation";
 
 type Event = Database["public"]["Tables"]["events"]["Row"];
 type Participant = Database["public"]["Tables"]["event_participants"]["Row"];
@@ -33,6 +35,8 @@ export function EventCalendar({ currentUser, initialEvents, initialParticipants,
   const [cursor, setCursor] = useState(() => asJstCalendarDate(new Date()));
   const [view, setView] = useState<View>("month");
   const [panel, setPanel] = useState<Panel>({ kind: "none" });
+  const [creationChoiceOpen, setCreationChoiceOpen] = useState(false);
+  const router = useRouter();
   const names = useMemo(() => new Map(people.map((person) => [person.id, person])), [people]);
   const days = view === "month"
     ? eachDayOfInterval({ start: startOfWeek(startOfMonth(cursor), { weekStartsOn: 1 }), end: endOfWeek(endOfMonth(cursor), { weekStartsOn: 1 }) })
@@ -109,7 +113,7 @@ export function EventCalendar({ currentUser, initialEvents, initialParticipants,
   return <main className={`${compact ? "min-h-0" : "min-h-dvh"} bg-muted/20`}>
     {!compact && <header className="flex flex-wrap items-center justify-between gap-3 border-b bg-background px-4 py-3 md:px-8">
       <div className="flex items-center gap-2"><CalendarDays className="size-5" /><h1 className="text-lg font-semibold">イベントカレンダー</h1><span className="text-sm text-muted-foreground">{currentUser.nickname}</span></div>
-      <div className="flex items-center gap-2"><Link href="/planning" className="text-sm text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link><Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き状況</Link>{(role === "admin" || role === "super_user") && <Link href="/admin" className="text-sm text-muted-foreground underline-offset-4 hover:underline">管理</Link>}{preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}<Button size="sm" onClick={() => setPanel({ kind: "form", event: null })}><Plus /> イベント作成</Button>{!preview && <SignOutButton variant="ghost" />}</div>
+      <div className="flex items-center gap-2"><Link href="/planning" className="text-sm text-muted-foreground underline-offset-4 hover:underline">イベント企画</Link><Link href="/availability" className="text-sm text-muted-foreground underline-offset-4 hover:underline">空き時間を登録・確認</Link>{(role === "admin" || role === "super_user") && <Link href="/admin" className="text-sm text-muted-foreground underline-offset-4 hover:underline">管理</Link>}{preview && <span className="rounded-full border border-amber-500/40 bg-amber-500/10 px-2 py-1 text-xs font-medium text-amber-700">ローカルプレビュー</span>}<Button size="sm" onClick={() => setCreationChoiceOpen(true)}><Plus /> イベント作成</Button>{!preview && <SignOutButton variant="ghost" />}</div>
     </header>}
     <div className={`mx-auto grid max-w-7xl gap-4 p-4 ${compact ? "grid-cols-1" : "md:grid-cols-[1fr_320px] md:p-8"}`}>
       <section className="overflow-hidden rounded-xl border bg-background">
@@ -119,6 +123,7 @@ export function EventCalendar({ currentUser, initialEvents, initialParticipants,
       {!compact && <aside className="hidden rounded-xl border bg-background p-4 md:block">{panel.kind === "detail" ? <EventDetail event={panel.event} participants={selectedParticipants} names={names} currentUser={currentUser} onRespond={respond} onEdit={() => setPanel({ kind: "form", event: panel.event })} onCancel={() => cancelEvent(panel.event)} /> : panel.kind === "form" ? <EventForm event={panel.event} onSubmit={saveEvent} onClose={() => setPanel({ kind: "none" })} /> : <p className="text-sm text-muted-foreground">イベントを選択してください。</p>}</aside>}
     </div>
     {panel.kind !== "none" && <div className={`fixed inset-0 z-[60] bg-black/30 ${compact ? "" : "md:hidden"}`} onClick={() => setPanel({ kind: "none" })}><section className="absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-2xl border bg-background p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-xl" onClick={(event) => event.stopPropagation()}><div className="mb-2 flex justify-end"><Button variant="ghost" size="icon" aria-label="閉じる" onClick={() => setPanel({ kind: "none" })}><X /></Button></div>{panel.kind === "detail" ? <EventDetail event={panel.event} participants={selectedParticipants} names={names} currentUser={currentUser} onRespond={respond} onEdit={() => setPanel({ kind: "form", event: panel.event })} onCancel={() => cancelEvent(panel.event)} /> : <EventForm event={panel.event} onSubmit={saveEvent} onClose={() => setPanel({ kind: "none" })} />}</section></div>}
+    <Dialog open={creationChoiceOpen} onOpenChange={setCreationChoiceOpen}><DialogContent className="sm:max-w-md"><DialogHeader><DialogTitle>予定を作る前に、メンバーの空き時間を確認しますか？</DialogTitle><DialogDescription>空き時間を確認して共通の日時を選ぶことも、確認せずに予定を作ることもできます。</DialogDescription></DialogHeader><DialogFooter className="flex-col gap-2 sm:flex-row"><Button variant="outline" onClick={() => router.push("/planning")}>メンバーの空き時間を確認</Button><Button onClick={() => { setCreationChoiceOpen(false); setPanel({ kind: "form", event: null }); }}>確認せずに作成</Button></DialogFooter></DialogContent></Dialog>
   </main>;
 }
 

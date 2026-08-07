@@ -53,12 +53,12 @@ export function PresetPanel({
     <div className="flex h-full flex-col gap-3">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-muted-foreground">プリセット</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">空き時間パターン</h2>
           <p className="text-xs text-muted-foreground">
-            選んで日付をクリック/ドラッグ
+            パターンを選び、日付をクリック／ドラッグしてあなたの空き時間を登録
           </p>
         </div>
-        <Button size="icon" variant="ghost" onClick={openNew} aria-label="プリセットを追加">
+        <Button size="icon" variant="ghost" onClick={openNew} aria-label="空き時間パターンを追加">
           <Plus className="h-4 w-4" />
         </Button>
       </div>
@@ -95,7 +95,7 @@ export function PresetPanel({
         ))}
         {presets.length === 0 && (
           <li className="text-sm text-muted-foreground">
-            プリセットがありません。追加してください。
+            空き時間パターンがありません。追加してください。
           </li>
         )}
       </ul>
