@@ -4,7 +4,7 @@
 
 ## 現在地（最初に読む）
 
-**最終更新: 2026-08-07 / Cloudflare Workers移行を実装・ローカルworkerd検証済み。Cloudflare実環境の設定・staging E2E待ち**
+**最終更新: 2026-08-07 / Google Calendar同期MVP実装済み。環境変数設定・DB migration適用・デプロイ待ち**
 
 | 項目 | 状態 | 事実・次の判断 |
 | --- | --- | --- |
@@ -15,12 +15,14 @@
 | ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
 | Cloudflare Access 認証 | 実装済み・本番未検証 | JWT検証→Supabase allowlist→SSRセッション発行。13テストは成功済み。未許可メールには管理者登録依頼とGoogle再ログインの案内を返す。Cloudflare Dashboard/本番Secretは未設定。 |
 | Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solutions.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
+| Google Calendar同期（MVP） | 実装済み・DB適用済み・要環境変数設定 | サービスアカウント経由の一方向同期（アプリ→Google Calendar）。イベント作成・編集・キャンセル時に自動同期。作成者による再同期ボタン付き。`0008_google_calendar_sync.sql` はDB適用済み。Cloudflare Workerに `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`（Secret）/ `GOOGLE_CALENDAR_ID`（Variable）を設定してデプロイが必要。 |
 
 ### 次に行うこと（優先順）
 
 1. Cloudflare DashboardでWorker runtime Variables/Secret、Custom Domain、Access Applicationを設定し、stagingまたは本番前のE2Eを行う。デプロイはユーザー承認後にのみ実施する。
-2. 実Supabaseの migration `0005` / `0006` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
-3. 実機E2E（モバイル含む）を行う。ログイン、空き時間の下書き→確定→再読込→削除、他メンバー閲覧、企画、イベント参加、管理画面を確認する。
+2. Cloudflare WorkerにGoogle Calendar同期用の環境変数（`GOOGLE_SERVICE_ACCOUNT_JSON_BASE64`, `GOOGLE_CALENDAR_ID`）を設定する（`0008` DB適用済み）。
+3. 実Supabaseの migration `0005` / `0006` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
+4. 実機E2E（モバイル含む）を行う。ログイン、空き時間の下書き→確定→再読込→削除、他メンバー閲覧、企画、イベント参加、管理画面を確認する。
 
 ### Cloudflare Workersの互換性判断
 
@@ -86,7 +88,7 @@
 - [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
 - [x] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
 - [x] 実ブラウザで①→②→③の画面遷移、モバイルでの各画面の操作性、および空き時間更新後の企画候補再集計を確認
-- [ ] `0007_super_user_delete_event.sql` の実Supabase適用状況を確認
+- [x] `0007_super_user_delete_event.sql` の実Supabase適用状況を確認
 - [ ] `/admin` で許可メール管理・ロール変更を確認
 
 ## 次のフェーズ（未着手）

@@ -31,6 +31,9 @@ const previewEvents: Event[] = [
     created_by: previewCurrentUser.id,
     status: "published",
     created_at: "2026-08-01T00:00:00.000Z",
+    google_sync_status: null,
+    google_sync_error: null,
+    google_synced_at: null,
   },
 ];
 
@@ -76,8 +79,8 @@ export function getDevPlanningData() {
   return { currentUser: previewCurrentUser, members: previewPeople, initialSlots: previewPlanningSlots };
 }
 
-export function addDevEvent(event: Omit<Event, "id" | "created_at">): Event {
-  const created: Event = { ...event, id: crypto.randomUUID(), created_at: new Date().toISOString() };
+export function addDevEvent(event: Omit<Event, "id" | "created_at" | "google_sync_status" | "google_sync_error" | "google_synced_at">): Event {
+  const created: Event = { ...event, id: crypto.randomUUID(), created_at: new Date().toISOString(), google_sync_status: null, google_sync_error: null, google_synced_at: null };
   previewEvents.push(created);
   return created;
 }

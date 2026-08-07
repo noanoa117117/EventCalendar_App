@@ -9,7 +9,7 @@ Next.js 16（App Router）+ Supabase。イベント、空き時間登録、企�
 
 ## 2. DBスキーマを適用する
 
-`supabase/migrations/` の `0001` から `0007` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
+`supabase/migrations/` の `0001` から `0008` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
 
 ```bash
 npx supabase login
@@ -17,7 +17,7 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。`0007_super_user_delete_event.sql` は、キャンセル済みイベントをsuper userが完全削除するRPCを追加します。
+SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。`0007_super_user_delete_event.sql` は、キャンセル済みイベントをsuper userが完全削除するRPCを追加します。`0008_google_calendar_sync.sql` は、Google Calendar同期用のステータス列を追加します。
 
 ## 3. ローカル開発・fixture
 
@@ -70,6 +70,8 @@ Workers & Pages → 対象Worker → Settings → Variables and Secretsで、**r
 | Variable | `CF_ACCESS_TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
 | Variable | `CF_ACCESS_AUD` | Access ApplicationのAUD |
 | Secret | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key |
+| Secret | `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` | サービスアカウントJSONのBase64 |
+| Variable | `GOOGLE_CALENDAR_ID` | 同期先のGoogleカレンダーID |
 
 `SUPABASE_SERVICE_ROLE_KEY`は`wrangler.jsonc`や`vars`、`NEXT_PUBLIC_*`、ログ、レスポンスへ書きません。CLIで設定する場合は、値を表示・コミットせずに実行します。
 
@@ -130,3 +132,29 @@ npx wrangler rollback <previous-version-id>
 イベント作成者はイベントをキャンセルできます。キャンセルは履歴を残す論理削除です。`0007_super_user_delete_event.sql` 適用後は、super userだけが詳細画面の「完全に削除」からキャンセル済みイベントを物理削除できます。未キャンセルのイベントや一般ユーザーの削除はDB側で拒否されます。
 
 スマホの月表示では、同じ日に複数イベントがある場合、件数バッジは表示されますが、現状その月セルから個別のイベント詳細を開けません。週表示に切り替えると、各イベントをタップして詳細を確認できます。この月表示の詳細導線は次のUI修正対象です。
+
+## 7. Google Calendar同期（MVP）
+
+イベントの作成・編集・キャンセル時に、Googleカレンダーへ自動で一方向同期します。ChronicleBotやDiscordの構成は変更しません。
+
+### セットアップ
+
+1. Google Cloud Consoleでサービスアカウントを作成し、Calendar APIを有効化する。
+2. 同期先のGoogleカレンダーの共有設定で、サービスアカウントのメールに「予定の変更」権限を付与する。
+3. サービスアカウントのJSON鍵をBase64エンコードし、Cloudflare Workerの環境変数 `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` にSecretとして設定する。
+4. 同期先のカレンダーIDを `GOOGLE_CALENDAR_ID` に設定する。
+5. Supabaseに `0008_google_calendar_sync.sql` を適用する。
+
+```bash
+# Base64エンコード例
+base64 -w0 service-account.json
+```
+
+### 動作
+
+- イベント作成・編集 → Googleカレンダーにイベントを作成または更新
+- イベントキャンセル → Googleカレンダーからイベントを削除
+- Google event IDはアプリのイベントUUIDからハイフンを除去した値で決定（冪等）
+- 同期失敗時はDBイベントは維持し、イベント詳細に同期状態を表示
+- 作成者は「再同期」ボタンで手動再試行が可能
+- 環境変数が未設定の場合、同期は無視される（エラーにならない）

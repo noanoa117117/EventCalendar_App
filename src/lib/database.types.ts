@@ -10,6 +10,7 @@
 
 export type EventParticipantStatus = "going" | "maybe" | "declined";
 export type EventStatus = "published" | "cancelled";
+export type GoogleSyncStatus = "pending" | "synced" | "failed";
 export type AllowedEmailRole = "member" | "admin" | "super_user";
 
 export interface Database {
@@ -101,6 +102,9 @@ export interface Database {
           created_by: string;
           status: EventStatus;
           created_at: string;
+          google_sync_status: GoogleSyncStatus | null;
+          google_sync_error: string | null;
+          google_synced_at: string | null;
         };
         Insert: {
           id?: string;
@@ -111,6 +115,9 @@ export interface Database {
           created_by: string;
           status?: EventStatus;
           created_at?: string;
+          google_sync_status?: GoogleSyncStatus | null;
+          google_sync_error?: string | null;
+          google_synced_at?: string | null;
         };
         Update: Partial<Database["public"]["Tables"]["events"]["Insert"]>;
         Relationships: [];
