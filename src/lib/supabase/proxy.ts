@@ -15,6 +15,7 @@ export async function updateSession(request: NextRequest) {
     url.pathname = "/dev-preview";
     if (pathname === "/availability") url.searchParams.set("preview", "availability");
     if (pathname === "/planning") url.searchParams.set("preview", "planning");
+    if (pathname === "/events") url.searchParams.set("preview", "events");
     return NextResponse.rewrite(url);
   }
 

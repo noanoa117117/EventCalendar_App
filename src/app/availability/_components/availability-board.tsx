@@ -36,7 +36,7 @@ export function AvailabilityBoard({
   initialSlots?: Slot[];
   preview?: boolean;
   compact?: boolean;
-  onAvailabilityChanged?: (slots: Slot[]) => void;
+  onAvailabilityChanged?: () => void;
 }) {
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [cursorDate, setCursorDate] = useState<Date>(() => jstNow());
@@ -121,7 +121,7 @@ export function AvailabilityBoard({
         ? [...previous.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.preset_id === preset.id)), ...dates.map((date, i) => ({ id: `preview-${Date.now()}-${i}`, user_id: currentUser.id, date, start_time: preset.start_time, end_time: preset.end_time, preset_id: preset.id }))]
         : previous.filter((s) => !(s.user_id === currentUser.id && dates.includes(s.date) && s.start_time === preset.start_time && s.end_time === preset.end_time));
       replaceSlots(next);
-      onAvailabilityChanged?.(next);
+      onAvailabilityChanged?.();
       return;
     }
     const supabase = createClient();
@@ -137,7 +137,7 @@ export function AvailabilityBoard({
       return;
     }
     fetchSlots();
-    onAvailabilityChanged?.([]);
+    onAvailabilityChanged?.();
   }
 
   async function handleWeekDragCommit(
@@ -152,7 +152,7 @@ export function AvailabilityBoard({
         ? [...previous.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end)), { id: `preview-${Date.now()}`, user_id: currentUser.id, date, start_time: start, end_time: end, preset_id: null }]
         : previous.filter((s) => !(s.user_id === currentUser.id && s.date === date && s.start_time >= start && s.end_time <= end));
       replaceSlots(next);
-      onAvailabilityChanged?.(next);
+      onAvailabilityChanged?.();
       return;
     }
     const supabase = createClient();
@@ -168,7 +168,7 @@ export function AvailabilityBoard({
       return;
     }
     fetchSlots();
-    onAvailabilityChanged?.([]);
+    onAvailabilityChanged?.();
   }
 
   function goPrev() {
@@ -189,9 +189,8 @@ export function AvailabilityBoard({
   const [mobilePanel, setMobilePanel] = useState<"calendar" | "members" | "presets">("calendar");
   return (
     <div className={`flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col bg-border`}>
-      {preview && <div className="bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-800">ローカルモック（Supabaseには接続しません）</div>}
+      {preview && !compact && <div className="bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-800">ローカルモック（Supabaseには接続しません）</div>}
       <div className={`flex items-center border-b bg-background px-3 py-2 ${compact ? "" : "md:hidden"}`}>
-        <Link href="/events" className="mr-2"><Button size="icon" variant="ghost" aria-label="イベントカレンダーへ戻る"><ArrowLeft className="h-4 w-4" /></Button></Link>
         <Tabs value={mobilePanel} onValueChange={(v) => setMobilePanel(v as typeof mobilePanel)} className="flex-1">
           <TabsList className="grid w-full grid-cols-3"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger><TabsTrigger value="presets">プリセット</TabsTrigger></TabsList>
         </Tabs>
@@ -230,7 +229,7 @@ export function AvailabilityBoard({
           </Tabs>
         </div>
 
-        {activePreset && (
+        {activePreset && !compact && (
           <div
             className="flex items-center justify-between gap-2 border-b px-3 py-2 text-sm"
             style={{ backgroundColor: `${activePreset.color}22` }}
@@ -276,7 +275,7 @@ export function AvailabilityBoard({
           userId={currentUser.id}
           presets={presets}
           activePresetId={activePresetId}
-          onActivate={setActivePresetId}
+          onActivate={(id) => { setActivePresetId(id); if (compact) setMobilePanel("calendar"); }}
           onPresetsChange={setPresets}
           preview={preview}
         />

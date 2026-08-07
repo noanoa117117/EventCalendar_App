@@ -19,6 +19,9 @@ export default async function DevPreviewPage({ searchParams }: { searchParams: P
     const events = getDevPreviewData();
     return <Dashboard currentUser={planning.currentUser} members={planning.members} slots={planning.initialSlots} presets={availability.initialPresets} events={events.events} participants={events.participants} preview />;
   }
-  const { currentUser, events, participants, people } = getDevPreviewData();
-  return <EventCalendar currentUser={currentUser} initialEvents={events} initialParticipants={participants} people={people} preview />;
+  if (params.preview === "events") {
+    const { currentUser, events, participants, people } = getDevPreviewData();
+    return <EventCalendar currentUser={currentUser} initialEvents={events} initialParticipants={participants} people={people} preview />;
+  }
+  notFound();
 }
