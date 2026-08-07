@@ -1,0 +1,236 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { addMonths, addWeeks, format } from "date-fns";
+import { ja } from "date-fns/locale";
+import { toast } from "sonner";
+import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  jstNow,
+  monthGridRange,
+  registrableWindow,
+  weekRange,
+} from "@/lib/availability";
+import type { Preset, Profile, Slot } from "@/lib/types";
+import { MemberList } from "./member-list";
+import { PresetPanel } from "./preset-panel";
+import { MonthCalendar } from "./month-calendar";
+import { WeekCalendar } from "./week-calendar";
+
+export function AvailabilityBoard({
+  currentUser,
+  members,
+  initialPresets,
+}: {
+  currentUser: Profile;
+  members: Profile[];
+  initialPresets: Preset[];
+}) {
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
+  const [cursorDate, setCursorDate] = useState<Date>(() => jstNow());
+  const [visibleIds, setVisibleIds] = useState<Set<string>>(
+    () => new Set([currentUser.id]),
+  );
+  const [presets, setPresets] = useState<Preset[]>(initialPresets);
+  const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const editableWindow = useMemo(() => registrableWindow(), []);
+  const activePreset = presets.find((p) => p.id === activePresetId) ?? null;
+
+  const range = useMemo(
+    () => (viewMode === "month" ? monthGridRange(cursorDate) : weekRange(cursorDate)),
+    [viewMode, cursorDate],
+  );
+
+  const fetchSlots = useCallback(async () => {
+    if (visibleIds.size === 0) {
+      setSlots([]);
+      return;
+    }
+    setLoading(true);
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from("availability_slots")
+      .select("*")
+      .in("user_id", Array.from(visibleIds))
+      .gte("date", format(range.start, "yyyy-MM-dd"))
+      .lte("date", format(range.end, "yyyy-MM-dd"));
+    setLoading(false);
+    if (error) {
+      toast.error("空き時間の取得に失敗しました。");
+      return;
+    }
+    setSlots(data ?? []);
+  }, [visibleIds, range]);
+
+  useEffect(() => {
+    // Sync with Supabase (an external system) whenever the visible
+    // members or displayed date range change - the classic "fetching
+    // data" effect (https://react.dev/learn/you-might-not-need-an-effect
+    // #fetching-data). There's no cache/query library in this project's
+    // stack to move it into, so this stays a plain effect.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchSlots();
+  }, [fetchSlots]);
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setActivePresetId(null);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  function toggleMember(id: string) {
+    setVisibleIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handlePaint(dates: string[], action: "apply" | "remove", preset: Preset) {
+    const supabase = createClient();
+    const { error } = await supabase.rpc("set_availability", {
+      p_dates: dates,
+      p_start: preset.start_time,
+      p_end: preset.end_time,
+      p_active: action === "apply",
+      p_preset_id: action === "apply" ? preset.id : null,
+    });
+    if (error) {
+      toast.error("空き時間の更新に失敗しました。");
+      return;
+    }
+    fetchSlots();
+  }
+
+  async function handleWeekDragCommit(
+    date: string,
+    start: string,
+    end: string,
+    action: "apply" | "remove",
+  ) {
+    const supabase = createClient();
+    const { error } = await supabase.rpc("set_availability", {
+      p_dates: [date],
+      p_start: start,
+      p_end: end,
+      p_active: action === "apply",
+      p_preset_id: null,
+    });
+    if (error) {
+      toast.error("空き時間の更新に失敗しました。");
+      return;
+    }
+    fetchSlots();
+  }
+
+  function goPrev() {
+    setCursorDate((d) => (viewMode === "month" ? addMonths(d, -1) : addWeeks(d, -1)));
+  }
+  function goNext() {
+    setCursorDate((d) => (viewMode === "month" ? addMonths(d, 1) : addWeeks(d, 1)));
+  }
+  function goToday() {
+    setCursorDate(jstNow());
+  }
+
+  const title =
+    viewMode === "month"
+      ? format(cursorDate, "yyyy年M月", { locale: ja })
+      : `${format(range.start, "M/d", { locale: ja })} - ${format(range.end, "M/d", { locale: ja })}`;
+
+  return (
+    <div className="grid h-dvh grid-cols-[200px_1fr_260px] gap-px bg-border">
+      <aside className="overflow-y-auto bg-background p-4">
+        <MemberList
+          members={members}
+          currentUserId={currentUser.id}
+          visibleIds={visibleIds}
+          onToggle={toggleMember}
+        />
+      </aside>
+
+      <main className="flex flex-col overflow-hidden bg-background">
+        <div className="flex items-center justify-between gap-3 border-b p-3">
+          <div className="flex items-center gap-1">
+            <Button size="icon" variant="ghost" onClick={goPrev} aria-label="前へ">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button size="icon" variant="ghost" onClick={goNext} aria-label="次へ">
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button variant="outline" size="sm" onClick={goToday}>
+              今日
+            </Button>
+            <h1 className="ml-2 text-sm font-semibold">{title}</h1>
+            {loading && <span className="text-xs text-muted-foreground">更新中...</span>}
+          </div>
+          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "week")}>
+            <TabsList>
+              <TabsTrigger value="month">月</TabsTrigger>
+              <TabsTrigger value="week">週</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+
+        {activePreset && (
+          <div
+            className="flex items-center justify-between gap-2 border-b px-3 py-2 text-sm"
+            style={{ backgroundColor: `${activePreset.color}22` }}
+          >
+            <span>
+              「{activePreset.label}」を適用中 - 日付をクリック／ドラッグで登録・解除
+            </span>
+            <Button size="sm" variant="ghost" onClick={() => setActivePresetId(null)}>
+              <X className="mr-1 h-3.5 w-3.5" />
+              終了 (Esc)
+            </Button>
+          </div>
+        )}
+
+        <div className="flex-1 overflow-hidden">
+          {viewMode === "month" ? (
+            <MonthCalendar
+              cursorDate={cursorDate}
+              members={members}
+              visibleIds={visibleIds}
+              currentUserId={currentUser.id}
+              slots={slots}
+              activePreset={activePreset}
+              window={editableWindow}
+              onPaint={handlePaint}
+            />
+          ) : (
+            <WeekCalendar
+              cursorDate={cursorDate}
+              members={members}
+              visibleIds={visibleIds}
+              currentUserId={currentUser.id}
+              slots={slots}
+              window={editableWindow}
+              onDragCommit={handleWeekDragCommit}
+            />
+          )}
+        </div>
+      </main>
+
+      <aside className="overflow-y-auto bg-background p-4">
+        <PresetPanel
+          userId={currentUser.id}
+          presets={presets}
+          activePresetId={activePresetId}
+          onActivate={setActivePresetId}
+          onPresetsChange={setPresets}
+        />
+      </aside>
+    </div>
+  );
+}

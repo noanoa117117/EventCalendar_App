@@ -1,0 +1,102 @@
+import {
+  addDays,
+  addMonths,
+  endOfMonth,
+  endOfWeek,
+  startOfMonth,
+  startOfWeek,
+} from "date-fns";
+import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+
+// Timezone is fixed to Asia/Tokyo for the whole app (REQUIREMENTS.md
+// section 7), independent of the viewer's device timezone.
+export const APP_TIME_ZONE = "Asia/Tokyo";
+
+export function jstNow(): Date {
+  return toZonedTime(new Date(), APP_TIME_ZONE);
+}
+
+export function jstToday(): string {
+  return formatInTimeZone(new Date(), APP_TIME_ZONE, "yyyy-MM-dd");
+}
+
+// Registrable window: today through the last day of (current month + 3
+// months), per REQUIREMENTS.md section 5.
+export function registrableWindow(): { min: string; max: string } {
+  const now = jstNow();
+  const max = endOfMonth(addMonths(now, 3));
+  return {
+    min: jstToday(),
+    max: formatInTimeZone(max, APP_TIME_ZONE, "yyyy-MM-dd"),
+  };
+}
+
+export function isDateEditable(dateStr: string, window = registrableWindow()) {
+  return dateStr >= window.min && dateStr <= window.max;
+}
+
+// Full-weeks grid around a month, Sunday-start (matches MonthCalendar).
+export function monthGridRange(date: Date): { start: Date; end: Date } {
+  return {
+    start: startOfWeek(startOfMonth(date), { weekStartsOn: 0 }),
+    end: endOfWeek(endOfMonth(date), { weekStartsOn: 0 }),
+  };
+}
+
+export function weekRange(date: Date): { start: Date; end: Date } {
+  const start = startOfWeek(date, { weekStartsOn: 0 });
+  return { start, end: addDays(start, 6) };
+}
+
+export interface TimeRange {
+  start_time: string;
+  end_time: string;
+}
+
+// Minutes since midnight. '00:00:00' as an *end* time is a sentinel for
+// "end of day" (24:00) - see supabase/migrations/0001_init.sql. Never
+// pass a start time into this treating it as an end.
+export function endMinutes(time: string): number {
+  if (time.startsWith("00:00")) return 1440;
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export function startMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
+export function minutesToTime(min: number): string {
+  if (min >= 1440) return "00:00";
+  const h = Math.floor(min / 60);
+  const m = min % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+// True when [start,end) is fully covered by the union of the given
+// same-day ranges - mirrors public.set_availability's merge semantics.
+export function isRangeCovered(ranges: TimeRange[], start: string, end: string) {
+  const targetStart = startMinutes(start);
+  const targetEnd = endMinutes(end);
+  const intervals = ranges
+    .map((r) => [startMinutes(r.start_time), endMinutes(r.end_time)] as const)
+    .sort((a, b) => a[0] - b[0]);
+
+  let cursor = targetStart;
+  for (const [s, e] of intervals) {
+    if (s > cursor) break;
+    if (e > cursor) cursor = e;
+    if (cursor >= targetEnd) return true;
+  }
+  return cursor >= targetEnd;
+}
+
+// Renders a stored time value for display. Pass isEnd=true for end_time
+// columns, where '00:00' is the end-of-day sentinel and should read
+// "24:00" rather than "00:00".
+export function formatTimeLabel(time: string, isEnd = false) {
+  const hhmm = time.slice(0, 5);
+  if (isEnd && hhmm === "00:00") return "24:00";
+  return hhmm;
+}
