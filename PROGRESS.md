@@ -98,6 +98,14 @@
 
 ## 直近の変更記録
 
+### 管理画面の自己許可メール保護・更新後再取得（2026-08-08）
+
+- **変更理由**: 管理者が自分自身の許可メールを変更・無効化・削除してアクセスを失う経路を、UIとDBの両方で防止する。また、管理操作成功後の一覧再取得失敗を操作失敗と誤表示しない。
+- **実装**: `AdminPage` から正規化済みの認証メールを `AdminPanel` へ渡し、デスクトップ・モバイル・追加フォームで自己対象を拒否。`manage_allowed_email` / `delete_allowed_email` は `auth.jwt()` の正規化済みメールと対象メールが一致した場合に拒否し、最後の有効super user保護は維持。RPC成功後はローカル更新してから一覧を再取得し、再取得失敗時は成功・表示維持を明示する。
+- **変更ファイル**: `src/app/admin/admin-panel.tsx`、`src/app/admin/page.tsx`、`supabase/migrations/0010_admin_self_access_protection.sql`、`tests/member-access.test.ts`。
+- **未完了**: `0010_admin_self_access_protection.sql` の実Supabase適用、実機（デスクトップ／モバイル）E2Eは未実施。
+
+
 ### Google Calendar同期: トークン交換エラー修正（2026-08-07）
 
 - **根本原因**: Google OAuth JWT Bearerの`grant_type`を`urn:ietf:params:oauth:2.0:jwt-bearer`と誤指定していた。正しくは`urn:ietf:params:oauth:grant-type:jwt-bearer`。

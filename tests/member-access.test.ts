@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 
 const migration = readFileSync(new URL("../supabase/migrations/0009_active_members_and_admin_nicknames.sql", import.meta.url), "utf8");
+const selfProtectionMigration = readFileSync(new URL("../supabase/migrations/0010_admin_self_access_protection.sql", import.meta.url), "utf8");
 const adminPanel = readFileSync(new URL("../src/app/admin/admin-panel.tsx", import.meta.url), "utf8");
 const availabilityPage = readFileSync(new URL("../src/app/availability/page.tsx", import.meta.url), "utf8");
 const planningPage = readFileSync(new URL("../src/app/planning/page.tsx", import.meta.url), "utf8");
@@ -40,6 +41,18 @@ test("admin UI distinguishes email and nickname and handles unset names without 
   assert.match(adminPanel, /entry\.nickname \?\? "未設定"/);
   assert.match(adminPanel, /break-words/);
   assert.match(adminPanel, /list_managed_allowed_emails/);
+});
+
+test("admin self-access protection is enforced in the UI and mutation RPCs", () => {
+  assert.match(adminPanel, /actorEmail/);
+  assert.match(adminPanel, /normalized === actorEmail/);
+  assert.match(adminPanel, /entry\.email\.trim\(\)\.toLowerCase\(\) === actorEmail/);
+  assert.match(adminPanel, /操作は成功しましたが、一覧の再取得に失敗しました。表示中の内容を維持しています。/);
+  assert.match(selfProtectionMigration, /v_actor_email text := lower\(btrim\(coalesce\(auth\.jwt\(\) ->> 'email', ''\)\)\)/);
+  assert.match(selfProtectionMigration, /if v_email = v_actor_email then/);
+  assert.match(selfProtectionMigration, /cannot manage own allowlist entry/);
+  assert.match(selfProtectionMigration, /cannot remove the last enabled super user/);
+  assert.match(selfProtectionMigration, /create or replace function public\.delete_allowed_email/);
 });
 
 test("offboarding keeps profiles and historic event identity data intact", () => {
