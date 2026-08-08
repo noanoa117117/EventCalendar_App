@@ -49,13 +49,13 @@ test("header is a glass navbar without scene elements", () => {
   assert.match(css, /\.glass-nav\s*{[^}]*backdrop-filter:\s*blur/, "glass-nav must define a blur backdrop-filter");
 });
 
-test("event calendar renders NightScene and has page padding", () => {
+test("event calendar renders NightScene without the page-content padding wrapper", () => {
   const calendar = read("src/app/events/event-calendar.tsx");
 
   assert.match(calendar, /import.*NightScene.*from "@\/components\/night-beach-scene"/, "must import NightScene");
   assert.match(calendar, /<NightScene/, "must render NightScene");
   assert.doesNotMatch(calendar, /BeachScene/, "old BeachScene must not be referenced");
-  assert.match(calendar, /page-content/, "must apply page-content padding wrapper");
+  assert.doesNotMatch(calendar, /page-content/, "event calendar must not use page-content (h-dvh layout)");
 });
 
 test("CSS supports reduced motion", () => {

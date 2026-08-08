@@ -396,7 +396,13 @@
 .page-content {
   position: relative;
   z-index: 1;
-  padding-bottom: max(28vh, 200px);
+  padding-bottom: clamp(48px, 8dvh, 120px);
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .page-content {
+    padding-bottom: 32px;
+  }
 }
 
 /* Mobile: hide palms, reduce swells */
