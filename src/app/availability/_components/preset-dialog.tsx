@@ -18,14 +18,14 @@ import { Checkbox } from "@/components/ui/checkbox";
 import type { Preset } from "@/lib/types";
 
 const PALETTE = [
-  "#ef4444",
-  "#f97316",
-  "#eab308",
-  "#22c55e",
-  "#14b8a6",
-  "#3b82f6",
-  "#8b5cf6",
-  "#ec4899",
+  { value: "#c66e60", token: "var(--member-1)" },
+  { value: "#6e9d4f", token: "var(--member-2)" },
+  { value: "#1f9d89", token: "var(--member-3)" },
+  { value: "#2395b5", token: "var(--member-4)" },
+  { value: "#4285be", token: "var(--member-5)" },
+  { value: "#746dcc", token: "var(--member-6)" },
+  { value: "#a369bd", token: "var(--member-7)" },
+  { value: "#c36a91", token: "var(--member-8)" },
 ];
 
 export function PresetDialog({
@@ -98,7 +98,7 @@ function PresetForm({
     preset && !initialMidnight ? preset.end_time.slice(0, 5) : "23:30",
   );
   const [endIsMidnight, setEndIsMidnight] = useState(initialMidnight);
-  const [color, setColor] = useState(preset?.color ?? PALETTE[nextSortOrder % PALETTE.length]);
+  const [color, setColor] = useState(preset?.color ?? PALETTE[nextSortOrder % PALETTE.length].value);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -233,19 +233,19 @@ function PresetForm({
         <div className="space-y-2">
           <Label>色</Label>
           <div className="flex flex-wrap gap-2">
-            {PALETTE.map((c) => (
+            {PALETTE.map((colorOption) => (
               <button
-                key={c}
+                key={colorOption.value}
                 type="button"
-                onClick={() => setColor(c)}
+                onClick={() => setColor(colorOption.value)}
                 className="h-7 w-7 rounded-full ring-offset-2 ring-offset-background"
                 style={{
-                  backgroundColor: c,
-                  boxShadow: color === c ? `0 0 0 2px ${c}` : undefined,
-                  outline: color === c ? "2px solid var(--ring)" : undefined,
+                  backgroundColor: colorOption.token,
+                  boxShadow: color === colorOption.value ? `0 0 0 2px ${colorOption.token}` : undefined,
+                  outline: color === colorOption.value ? "2px solid var(--ring)" : undefined,
                   outlineOffset: 2,
                 }}
-                aria-label={c}
+                aria-label="メンバー色を選択"
               />
             ))}
           </div>

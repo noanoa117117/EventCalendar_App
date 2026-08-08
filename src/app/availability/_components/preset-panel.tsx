@@ -225,36 +225,56 @@ export function PresetPanel({
           {editDisabledHint}
         </p>
       )}
+      {!canEdit && editDisabledHint && (
+        <p className="text-xs text-muted-foreground md:hidden" role="status">
+          {editDisabledHint}
+        </p>
+      )}
 
       {/* Mobile: horizontal scrollable pill bar */}
-      <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-0.5 md:hidden" role="listbox" aria-label="空き時間パターン">
+      <div className="flex min-w-0 gap-1.5 overflow-x-auto overscroll-x-contain pb-0.5 md:hidden" role="listbox" aria-label="空き時間パターン">
         {presets.map((p) => {
           const active = activePresetId === p.id;
           return (
-            <button
-              key={p.id}
-              type="button"
-              role="option"
-              aria-selected={active}
-              disabled={!canActivate}
-              onClick={() => onActivate(canActivate && !active ? p.id : null)}
-              className="flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
-              style={{
-                borderColor: active ? p.color : undefined,
-                backgroundColor: active ? `${p.color}18` : "transparent",
-                boxShadow: active ? `0 0 0 1px ${p.color}` : undefined,
-              }}
-            >
-              <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-              <span className="whitespace-nowrap">{p.label}</span>
-            </button>
+            <div key={p.id} className="flex min-w-0 max-w-[85vw] shrink-0 items-center gap-1">
+              <button
+                type="button"
+                role="option"
+                aria-selected={active}
+                disabled={!canActivate}
+                onClick={() => onActivate(canActivate && !active ? p.id : null)}
+                className="flex min-h-11 min-w-0 flex-1 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50"
+                style={{
+                  borderColor: active ? p.color : undefined,
+                  backgroundColor: active ? `${p.color}18` : "transparent",
+                  boxShadow: active ? `0 0 0 1px ${p.color}` : undefined,
+                }}
+              >
+                <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                <span className="truncate">{p.label}</span>
+              </button>
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                className="h-11 w-11 shrink-0"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  openEdit(p);
+                }}
+                disabled={!canEdit || p.user_id !== userId}
+                aria-label={`${p.label}を編集`}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
           );
         })}
         <button
           type="button"
           onClick={openNew}
           disabled={!canEdit}
-          className="flex shrink-0 items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+          className="flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
           aria-label="パターンを追加"
         >
           <Plus className="size-3.5" />

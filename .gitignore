@@ -46,3 +46,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local scratch: bundling the repo for external AI design review
+/browser-ai-bundle/
+/share-AI/
+/Share-AI/
+/tools/
+__pycache__/

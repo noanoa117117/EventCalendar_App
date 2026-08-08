@@ -197,10 +197,10 @@ export function AvailabilityBoard({
 
   const [mobilePanel, setMobilePanel] = useState<"calendar" | "members">("calendar");
   return (
-    <div className={`flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col bg-border`}>
-      {preview && !compact && <div className="bg-amber-500/15 px-3 py-1.5 text-center text-xs font-medium text-amber-800">ローカルモック（Supabaseには接続しません）</div>}
+    <div className={`@container flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col bg-border`}>
+      {preview && !compact && <div className="bg-warning-soft px-3 py-1.5 text-center text-xs font-medium text-warning-foreground">ローカルモック（Supabaseには接続しません）</div>}
       {!compact && <AppHeader current="availability" onBeforeNavigate={() => !hasDraft || window.confirm("未保存の変更があります。移動しますか？")} />}
-      <div className={`border-b bg-background px-3 py-2 ${compact ? "" : "md:hidden"}`}>
+      <div className="border-b bg-background px-3 py-2 @lg:hidden">
         <div className="flex items-center gap-2">
           <Tabs value={mobilePanel} onValueChange={(v) => setMobilePanel(v as typeof mobilePanel)} className="flex-1">
             <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger></TabsList>
@@ -215,8 +215,8 @@ export function AvailabilityBoard({
       </div>
       <div className={`grid min-h-0 flex-1 grid-cols-1 gap-px bg-border ${mobilePanel === "calendar"
         ? "grid-rows-[minmax(0,1fr)_auto]"
-        : "grid-rows-[minmax(0,1fr)]"} ${compact ? "" : "md:grid-cols-[200px_1fr_260px] md:grid-rows-1"}`}>
-      <aside className={`${mobilePanel === "members" ? "" : "hidden"} min-h-0 overflow-y-auto bg-background p-4 ${compact ? "" : "md:block"}`}>
+        : "grid-rows-[minmax(0,1fr)]"} @lg:grid-cols-[12rem_1fr] @3xl:grid-cols-[12rem_1fr_16rem] @lg:grid-rows-1`}>
+      <aside className={`${mobilePanel === "members" ? "" : "hidden"} min-h-0 overflow-y-auto bg-background p-4 @lg:block`}>
         <MemberList
           members={members}
           currentUserId={currentUser.id}
@@ -225,11 +225,11 @@ export function AvailabilityBoard({
         />
       </aside>
 
-      <main className={`${mobilePanel === "calendar" ? "" : "hidden"} flex min-h-0 min-w-0 flex-col overflow-hidden bg-background ${compact ? "" : "md:flex"}`}>
-        <div className="flex flex-col gap-2 border-b p-3 md:flex-row md:items-center md:justify-between">
+      <main className={`${mobilePanel === "calendar" ? "" : "hidden"} flex min-h-0 min-w-0 flex-col overflow-hidden bg-background @lg:flex`}>
+        <div className="sticky top-0 z-20 flex flex-col gap-2 border-b bg-card p-3 @lg:flex-row @lg:items-center @lg:justify-between">
           <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
             <div className="flex flex-wrap items-center gap-1">
-            <Link href="/events" onClick={(e) => { if (hasDraft && !window.confirm("未保存の変更があります。移動しますか？")) e.preventDefault(); }} className="mr-1 hidden md:block"><Button size="icon" variant="ghost" aria-label="イベントカレンダーへ戻る"><ArrowLeft className="h-4 w-4" /></Button></Link>
+            <Link href="/events" onClick={(e) => { if (hasDraft && !window.confirm("未保存の変更があります。移動しますか？")) e.preventDefault(); }} className="mr-1 hidden @lg:block"><Button size="icon" variant="ghost" aria-label="イベントカレンダーへ戻る"><ArrowLeft className="h-4 w-4" /></Button></Link>
             <Button size="icon" variant="ghost" onClick={() => { if (hasDraft && !window.confirm("未保存の変更があります。移動しますか？")) return; goPrev(); }} aria-label="前へ">
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -240,13 +240,13 @@ export function AvailabilityBoard({
               今日
             </Button>
             </div>
-            <div className="hidden min-w-0 basis-full md:block md:flex-1"><h1 className="text-sm font-semibold">空き時間を登録・確認</h1><p className="text-xs text-muted-foreground">あなたの空き時間を登録し、選択したメンバーの空き時間を確認できます。</p><p className="text-xs text-muted-foreground">{title}</p></div>
-            <div className="flex w-full flex-wrap items-center gap-1 md:w-auto">
+            <div className="hidden min-w-0 basis-full @lg:block @lg:flex-1"><h1 className="text-sm font-semibold">空き時間を登録・確認</h1><p className="text-xs text-muted-foreground">あなたの空き時間を登録し、選択したメンバーの空き時間を確認できます。</p><p className="text-xs text-muted-foreground">{title}</p></div>
+            <div className="flex w-full flex-wrap items-center gap-1 @lg:w-auto">
               {loading && <span className="text-xs text-muted-foreground">更新中...</span>}
               {!editing && <Button className="shrink-0" size="sm" variant="outline" disabled={!selfVisible} onClick={() => setEditing(true)}>編集する</Button>}
-              {editing && <span className="text-xs text-amber-700 md:hidden">{hasDraft ? `未保存 (${draftOps.length})` : "編集中"}</span>}
-              {editing && <div className="hidden md:contents"><span className="text-xs text-amber-700">{hasDraft ? `未保存の変更あり (${draftOps.length})` : "編集モード"}</span>{viewMode === "month" && <Button className="shrink-0" size="sm" variant="destructive" disabled={!selfVisible || confirming || deletableMonthDates.length === 0} onClick={() => setDeleteMonthDialogOpen(true)}>この月を全削除</Button>}<Button className="shrink-0" size="sm" disabled={!hasDraft || confirming} onClick={confirmDraft}>{confirming ? "保存中…" : "変更を確定"}</Button><Button className="shrink-0" size="sm" variant="ghost" disabled={confirming} onClick={cancelDraft}>取り消す</Button></div>}
-              <Tabs className="hidden shrink-0 md:block" value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "week")}>
+              {editing && <span className="text-xs text-warning-foreground">{hasDraft ? `未保存の変更あり (${draftOps.length})` : "編集モード"}</span>}
+              {editing && <div className="contents">{viewMode === "month" && <Button className="shrink-0" size="sm" variant="destructive" disabled={!selfVisible || confirming || deletableMonthDates.length === 0} onClick={() => setDeleteMonthDialogOpen(true)}>この月を全削除</Button>}<Button className="shrink-0" size="sm" disabled={!hasDraft || confirming} onClick={confirmDraft}>{confirming ? "保存中…" : "変更を確定"}</Button><Button className="shrink-0" size="sm" variant="ghost" disabled={confirming} onClick={cancelDraft}>取り消す</Button></div>}
+              <Tabs className="hidden shrink-0 @lg:block" value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "week")}>
                 <TabsList>
                   <TabsTrigger value="month">月</TabsTrigger>
                   <TabsTrigger value="week">週</TabsTrigger>
@@ -329,7 +329,7 @@ export function AvailabilityBoard({
 
       </main>
 
-      <aside className={`${mobilePanel === "calendar" ? "min-h-0 overflow-y-auto border-t px-3 py-2 md:border-t-0 md:p-4" : "hidden"} bg-background ${compact ? "max-h-40" : "md:block"}`}>
+      <aside className={`${mobilePanel === "calendar" ? "min-h-0 overflow-y-auto border-t px-3 py-2 @lg:border-t-0 @lg:p-4" : "hidden"} bg-background @lg:block`}>
         <PresetPanel
           userId={currentUser.id}
           presets={presets}
@@ -350,14 +350,6 @@ export function AvailabilityBoard({
       </aside>
       </div>
 
-      {editing && !compact && (
-        <div className="flex items-center gap-2 border-t bg-background px-3 py-2 md:hidden">
-          {viewMode === "month" && <Button className="shrink-0" size="sm" variant="destructive" disabled={!selfVisible || confirming || deletableMonthDates.length === 0} onClick={() => setDeleteMonthDialogOpen(true)}>全削除</Button>}
-          <div className="flex-1" />
-          <Button className="shrink-0" size="sm" variant="ghost" disabled={confirming} onClick={cancelDraft}>取り消す</Button>
-          <Button className="shrink-0" size="sm" disabled={!hasDraft || confirming} onClick={confirmDraft}>{confirming ? "保存中…" : "確定"}</Button>
-        </div>
-      )}
     </div>
   );
 }

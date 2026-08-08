@@ -2,21 +2,30 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format } from "date-fns";
-import { ja } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { isDateEditable, minutesToTime, weekRange } from "@/lib/availability";
+import { isDateEditable, jstToday, minutesToTime, weekRange } from "@/lib/availability";
+import { resolveTouchGesture, shouldCommitWeekGesture, type WeekGestureIntent } from "@/lib/week-gesture";
 import type { Profile, Slot } from "@/lib/types";
 
-const ROWS = 48; // 30-minute rows across a full day
+const ROWS = 48;
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
+type PendingTouch = {
+  pointerId: number;
+  date: string;
+  row: number;
+  action: "apply" | "remove";
+  startX: number;
+  startY: number;
+  intent: WeekGestureIntent;
+};
+
 function slotCoversRow(slot: Slot, rowStartMin: number, rowEndMin: number) {
-  const sMin =
-    Number(slot.start_time.slice(0, 2)) * 60 + Number(slot.start_time.slice(3, 5));
-  const eMin = slot.end_time.slice(0, 5) === "00:00"
+  const start = Number(slot.start_time.slice(0, 2)) * 60 + Number(slot.start_time.slice(3, 5));
+  const end = slot.end_time.slice(0, 5) === "00:00"
     ? 1440
     : Number(slot.end_time.slice(0, 2)) * 60 + Number(slot.end_time.slice(3, 5));
-  return sMin <= rowStartMin && eMin >= rowEndMin;
+  return start <= rowStartMin && end >= rowEndMin;
 }
 
 export function WeekCalendar({
@@ -39,206 +48,212 @@ export function WeekCalendar({
   canEdit: boolean;
 }) {
   const { start: weekStart } = weekRange(cursorDate);
-  const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
-
+  const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+  const today = jstToday();
   const orderedVisible = useMemo(() => {
-    const list = members.filter((m) => visibleIds.has(m.id));
-    list.sort((a, b) =>
-      a.id === currentUserId ? -1 : b.id === currentUserId ? 1 : a.nickname.localeCompare(b.nickname),
-    );
+    const list = members.filter((member) => visibleIds.has(member.id));
+    list.sort((a, b) => a.id === currentUserId ? -1 : b.id === currentUserId ? 1 : a.nickname.localeCompare(b.nickname));
     return list;
   }, [members, visibleIds, currentUserId]);
-
   const slotsByUserDate = useMemo(() => {
     const map = new Map<string, Slot[]>();
-    for (const s of slots) {
-      const key = `${s.user_id}|${s.date}`;
-      const list = map.get(key) ?? [];
-      list.push(s);
-      map.set(key, list);
+    for (const slot of slots) {
+      const key = `${slot.user_id}|${slot.date}`;
+      map.set(key, [...(map.get(key) ?? []), slot]);
     }
     return map;
   }, [slots]);
-
   const [dragDate, setDragDate] = useState<string | null>(null);
   const [dragRows, setDragRows] = useState<[number, number] | null>(null);
   const draggingRef = useRef(false);
   const dragDateRef = useRef<string | null>(null);
   const dragActionRef = useRef<"apply" | "remove" | null>(null);
   const dragRowsRef = useRef<[number, number] | null>(null);
+  const pendingTouchRef = useRef<PendingTouch | null>(null);
+  const onDragCommitRef = useRef(onDragCommit);
 
-  function isEditable(dateStr: string) {
-    return isDateEditable(dateStr, editableWindow);
+  function isEditable(date: string) {
+    return isDateEditable(date, editableWindow);
   }
 
-  function isOwnRowCovered(dateStr: string, row: number) {
-    const daySlots = slotsByUserDate.get(`${currentUserId}|${dateStr}`) ?? [];
-    return daySlots.some((s) => slotCoversRow(s, row * 30, (row + 1) * 30));
+  function isOwnRowCovered(date: string, row: number) {
+    return (slotsByUserDate.get(`${currentUserId}|${date}`) ?? []).some((slot) => slotCoversRow(slot, row * 30, (row + 1) * 30));
   }
 
-  function handleDown(dateStr: string, row: number) {
-    if (!canEdit || !isEditable(dateStr)) return;
+  function beginSelection(date: string, row: number, action: "apply" | "remove") {
     draggingRef.current = true;
-    dragDateRef.current = dateStr;
-    dragActionRef.current = isOwnRowCovered(dateStr, row) ? "remove" : "apply";
+    dragDateRef.current = date;
+    dragActionRef.current = action;
     dragRowsRef.current = [row, row];
-    setDragDate(dateStr);
+    setDragDate(date);
     setDragRows([row, row]);
   }
 
-  function handleEnter(dateStr: string, row: number) {
-    if (!canEdit || !draggingRef.current || dateStr !== dragDateRef.current) return;
-    const next: [number, number] = dragRowsRef.current ? [Math.min(dragRowsRef.current[0], row), Math.max(dragRowsRef.current[1], row)] : [row, row];
+  function extendSelection(date: string, row: number) {
+    if (!draggingRef.current || date !== dragDateRef.current) return;
+    const current = dragRowsRef.current ?? [row, row];
+    const next: [number, number] = [Math.min(current[0], row), Math.max(current[1], row)];
     dragRowsRef.current = next;
     setDragRows(next);
   }
 
-  useEffect(() => {
-    function finish(cancel = false) {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      if (!cancel && dragDateRef.current && dragActionRef.current && dragRowsRef.current) {
-        const start = minutesToTime(dragRowsRef.current[0] * 30);
-        const end = minutesToTime((dragRowsRef.current[1] + 1) * 30);
-        onDragCommit(dragDateRef.current, start, end, dragActionRef.current);
-      }
-      dragDateRef.current = null; dragActionRef.current = null; dragRowsRef.current = null;
-      setDragDate(null);
-      setDragRows(null);
+  function handlePointerDown(event: React.PointerEvent<HTMLDivElement>, date: string, row: number) {
+    if (!canEdit || !isEditable(date)) return;
+    // Global pointer listeners are mounted once. Capture the current callback
+    // at the user action, not the initial render where edit mode is false.
+    onDragCommitRef.current = onDragCommit;
+    const action = isOwnRowCovered(date, row) ? "remove" : "apply";
+    if (event.pointerType === "touch") {
+      pendingTouchRef.current = {
+        pointerId: event.pointerId,
+        date,
+        row,
+        action,
+        startX: event.clientX,
+        startY: event.clientY,
+        intent: "pending",
+      };
+      return;
     }
-    function move(e: PointerEvent) {
-      if (!draggingRef.current) return;
-      e.preventDefault();
-      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      const cell = el?.closest<HTMLElement>("[data-week-date][data-week-row]");
-      if (cell?.dataset.weekDate && cell.dataset.weekRow) handleEnter(cell.dataset.weekDate, Number(cell.dataset.weekRow));
-    }
-    const onUp = () => finish();
-    const onCancel = () => finish(true);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    window.addEventListener("pointermove", move, { passive: false });
-    return () => { window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onCancel); window.removeEventListener("pointermove", move); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    beginSelection(date, row, action);
+  }
 
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && draggingRef.current) {
-        draggingRef.current = false;
-        setDragDate(null);
-        setDragRows(null);
-        dragDateRef.current = null; dragActionRef.current = null; dragRowsRef.current = null;
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
+  function clearInteraction() {
+    pendingTouchRef.current = null;
+    draggingRef.current = false;
+    dragDateRef.current = null;
+    dragActionRef.current = null;
+    dragRowsRef.current = null;
+    setDragDate(null);
+    setDragRows(null);
+  }
 
-  const memberCount = Math.max(orderedVisible.length, 1);
-  const [mobileDay, setMobileDay] = useState(0);
-
-  function renderDayColumn(day: Date) {
-    const dateStr = format(day, "yyyy-MM-dd");
-    const editable = isEditable(dateStr);
-    return (
-      <div key={dateStr} className="relative flex border-l flex-1">
-        {orderedVisible.map((m) => (
-          <div key={m.id} className="relative" style={{ width: `${100 / memberCount}%` }}>
-            {Array.from({ length: ROWS }, (_, row) => {
-              const covered = (slotsByUserDate.get(`${m.id}|${dateStr}`) ?? []).some((s) =>
-                slotCoversRow(s, row * 30, (row + 1) * 30),
-              );
-              const isOwn = m.id === currentUserId;
-              const inPendingDrag =
-                isOwn &&
-                dragDate === dateStr &&
-                dragRows &&
-                row >= dragRows[0] &&
-                row <= dragRows[1];
-
-              return (
-                <div
-                  key={row}
-                  data-week-date={dateStr}
-                  data-week-row={row}
-                  onPointerDown={() => isOwn && canEdit && handleDown(dateStr, row)}
-                  onPointerEnter={() => isOwn && canEdit && handleEnter(dateStr, row)}
-                  className={cn(
-                    "h-11 border-b border-r border-dashed border-muted-foreground/10 touch-none",
-                    row % 4 === 0 && "border-t border-solid border-muted-foreground/20",
-                    isOwn && editable && "cursor-pointer",
-                    !editable && isOwn && "bg-muted/40",
-                  )}
-                  style={{
-                    backgroundColor: covered ? `${m.color}` + (isOwn ? "cc" : "66") : undefined,
-                    outline: inPendingDrag ? `2px solid ${m.color}` : undefined,
-                    outlineOffset: -2,
-                  }}
-                />
-              );
-            })}
-          </div>
-        ))}
-      </div>
+  function commitSelection() {
+    if (!dragDateRef.current || !dragActionRef.current || !dragRowsRef.current) return;
+    onDragCommitRef.current(
+      dragDateRef.current,
+      minutesToTime(dragRowsRef.current[0] * 30),
+      minutesToTime((dragRowsRef.current[1] + 1) * 30),
+      dragActionRef.current,
     );
   }
 
-  const timeLabels = (
-    <div className="text-right">
-      {Array.from({ length: ROWS }, (_, row) => (
-        <div key={row} className="h-11 pr-1 text-[10px] leading-[2.75rem] text-muted-foreground">
-          {row % 4 === 0 ? `${String(row / 2).padStart(2, "0")}:00` : ""}
-        </div>
-      ))}
-    </div>
-  );
+  useEffect(() => {
+    function move(event: PointerEvent) {
+      const touch = pendingTouchRef.current;
+      if (touch?.pointerId === event.pointerId) {
+        const intent = resolveTouchGesture({ clientX: touch.startX, clientY: touch.startY }, event);
+        if (intent === "scroll") {
+          touch.intent = "scroll";
+          return;
+        }
+        if (intent === "select" && touch.intent !== "select") {
+          touch.intent = "select";
+          beginSelection(touch.date, touch.row, touch.action);
+        }
+        if (touch.intent !== "select") return;
+      }
+      if (!draggingRef.current) return;
+      event.preventDefault();
+      const cell = (document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null)?.closest<HTMLElement>("[data-week-date][data-week-row]");
+      if (cell?.dataset.weekDate && cell.dataset.weekRow) extendSelection(cell.dataset.weekDate, Number(cell.dataset.weekRow));
+    }
+
+    function finish(event: PointerEvent) {
+      const touch = pendingTouchRef.current;
+      if (touch?.pointerId === event.pointerId && touch.intent === "pending") {
+        onDragCommitRef.current(touch.date, minutesToTime(touch.row * 30), minutesToTime((touch.row + 1) * 30), touch.action);
+        clearInteraction();
+        return;
+      }
+      if (touch?.pointerId === event.pointerId && !shouldCommitWeekGesture(touch.intent)) {
+        clearInteraction();
+        return;
+      }
+      if (draggingRef.current) commitSelection();
+      clearInteraction();
+    }
+
+    function cancel() {
+      // A cancelled touch belongs to a browser scroll or interrupted gesture;
+      // it must never write a draft availability operation.
+      clearInteraction();
+    }
+
+    window.addEventListener("pointermove", move, { passive: false });
+    window.addEventListener("pointerup", finish);
+    window.addEventListener("pointercancel", cancel);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", finish);
+      window.removeEventListener("pointercancel", cancel);
+    };
+  }, []);
+
+  const isDragging = dragDate !== null;
+
+  useEffect(() => {
+    function cancelOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") clearInteraction();
+    }
+    window.addEventListener("keydown", cancelOnEscape);
+    return () => window.removeEventListener("keydown", cancelOnEscape);
+  }, []);
 
   return (
-    <div className="flex h-full flex-col">
-      {/* Mobile: single day with day picker */}
-      <div className="flex flex-col md:hidden h-full">
-        <div className="grid grid-cols-7 border-b text-center text-xs font-medium">
-          {days.map((day, i) => {
-            const dateStr = format(day, "yyyy-MM-dd");
-            return (
-              <button key={dateStr} onClick={() => setMobileDay(i)}
-                className={cn("py-2 transition-colors", mobileDay === i ? "bg-primary/10 font-bold text-primary" : !isEditable(dateStr) ? "text-muted-foreground/60" : "text-muted-foreground")}>
-                {WEEKDAY_LABELS[day.getDay()]}
-                <div>{format(day, "d")}</div>
-              </button>
-            );
-          })}
-        </div>
-        <div className="flex flex-1 overflow-y-auto">
-          <div className="w-10 shrink-0">{timeLabels}</div>
-          {renderDayColumn(days[mobileDay])}
-        </div>
-      </div>
-
-      {/* Desktop: 7-column grid */}
-      <div className="hidden md:flex h-full flex-col overflow-auto">
-        <div className="min-w-[760px]">
-        <div
-          className="grid border-b text-center text-xs font-medium text-muted-foreground"
-          style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}
-        >
-          <div />
+    <div className="flex h-full min-h-0 flex-col">
+      <p className="shrink-0 border-b px-3 py-1 text-xs text-muted-foreground @lg:hidden" aria-live="polite">
+        ← 横にスワイプして曜日を移動。編集中は縦にドラッグして時間を選択できます。
+      </p>
+      <div className="min-h-0 flex-1 overflow-auto overscroll-contain">
+        <div className="grid min-w-[44rem] grid-cols-[3rem_repeat(7,minmax(4.5rem,1fr))] grid-rows-[auto_repeat(48,var(--row-h))] grid-rules">
+          <div className="sticky top-0 z-10 bg-card" />
           {days.map((day) => {
-            const dateStr = format(day, "yyyy-MM-dd");
+            const date = format(day, "yyyy-MM-dd");
             return (
-              <div key={dateStr} className={cn("py-2", !isEditable(dateStr) && "text-muted-foreground/60")}>
+              <div key={date} className={cn("sticky top-0 z-10 bg-card py-2 text-center text-xs font-medium text-muted-foreground", date === today && "text-today", !isEditable(date) && "text-muted-foreground/60")}>
                 {WEEKDAY_LABELS[day.getDay()]}
-                <div>{format(day, "M/d", { locale: ja })}</div>
+                <div>{format(day, "M/d")}</div>
               </div>
             );
           })}
-        </div>
+          {Array.from({ length: ROWS }, (_, row) => (
+            <div key={`time-${row}`} className="pr-1 text-right text-xs leading-[var(--row-h)] text-muted-foreground" style={{ gridColumn: 1, gridRow: row + 2 }}>
+              {row % 4 === 0 ? `${String(row / 2).padStart(2, "0")}:00` : ""}
+            </div>
+          ))}
+          {/* Pointer handlers below access refs only after user interaction. */}
+          {/* eslint-disable-next-line react-hooks/refs */}
+          {Array.from({ length: ROWS }, (_, row) => days.map((day, dayIndex) => {
+            const date = format(day, "yyyy-MM-dd");
+            const editable = isEditable(date);
+            const covered = orderedVisible.filter((member) => (slotsByUserDate.get(`${member.id}|${date}`) ?? []).some((slot) => slotCoversRow(slot, row * 30, (row + 1) * 30)));
+            const allCovered = orderedVisible.length > 0 && covered.length === orderedVisible.length;
+            const ownCovered = covered.some((member) => member.id === currentUserId);
+            const pending = dragDate === date && dragRows && row >= dragRows[0] && row <= dragRows[1];
+            const gradient = covered.map((member, index) => `${member.color} ${Math.round(index / covered.length * 100)}% ${Math.round((index + 1) / covered.length * 100)}%`).join(", ");
+            const memberLabel = covered.map((member) => member.id === currentUserId ? "自分" : member.nickname).join("、");
 
-        <div className="grid flex-1" style={{ gridTemplateColumns: `3rem repeat(7, minmax(100px, 1fr))` }}>
-          {timeLabels}
-          {days.map((day) => renderDayColumn(day))}
-        </div>
+            return (
+              <div
+                key={`${date}-${row}`}
+                data-week-date={date}
+                data-week-row={row}
+                onPointerDown={(event) => handlePointerDown(event, date, row)}
+                onPointerEnter={(event) => event.pointerType !== "touch" && extendSelection(date, row)}
+                title={memberLabel ? `${minutesToTime(row * 30)}–${minutesToTime((row + 1) * 30)}: ${memberLabel}` : undefined}
+                className={cn("relative touch-pan-x border-b border-dashed border-muted-foreground/10", isDragging && "touch-none", row % 4 === 0 && "border-t border-solid border-muted-foreground/20", editable && canEdit && "cursor-pointer", !editable && "bg-muted/40", allCovered && "overlap-block")}
+                style={{
+                  gridColumn: dayIndex + 2,
+                  gridRow: row + 2,
+                  backgroundImage: !allCovered && covered.length > 0 ? `linear-gradient(90deg, ${gradient})` : undefined,
+                  opacity: !allCovered && covered.length > 0 ? ownCovered ? 0.82 : 0.5 : undefined,
+                  outline: pending ? "2px solid var(--warning)" : undefined,
+                  outlineOffset: -2,
+                }}
+              />
+            );
+          }))}
         </div>
       </div>
     </div>

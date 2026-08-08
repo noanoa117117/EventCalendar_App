@@ -142,7 +142,7 @@ export function MonthCalendar({
           </div>
         ))}
       </div>
-      <div className="grid flex-1 grid-cols-7 grid-rows-6">
+      <div className="grid min-h-0 flex-1 grid-cols-7 auto-rows-[minmax(var(--cell-min-h),1fr)] overflow-y-auto grid-rules">
         {days.map((day) => {
           const dateStr = format(day, "yyyy-MM-dd");
           const inMonth = isSameMonth(day, cursorDate);
@@ -170,13 +170,13 @@ export function MonthCalendar({
               onPointerDown={(e) => handlePointerDown(dateStr, e)}
               onPointerEnter={() => handlePointerEnter(dateStr)}
               className={cn(
-                "flex select-none flex-col gap-1 border-b border-r p-1.5 text-left align-top",
+                "flex select-none flex-col gap-1 p-1.5 text-left align-top",
                 !inMonth && "bg-muted/30",
                 editable && canEdit && activePreset && "cursor-pointer",
                 !editable && "bg-muted/50",
                 dragging && "touch-none",
               )}
-              style={{ touchAction: canEdit && activePreset && editable ? "none" : "auto", outline: canEdit && (isVisitedNow || applied) ? `2px solid ${activePreset?.color ?? "#888"}` : undefined, outlineOffset: -2 }}
+              style={{ touchAction: canEdit && activePreset && editable ? "none" : "auto", ...(canEdit && (isVisitedNow || applied) && activePreset ? { backgroundColor: `color-mix(in oklab, ${activePreset.color} 14%, var(--card))`, borderLeft: `3px solid ${activePreset.color}` } : {}) }}
             >
               <span
                 className={cn(
@@ -198,9 +198,9 @@ export function MonthCalendar({
                   const titleLabel = m.id === currentUserId
                     ? `${isDraft ? "未確定 " : ""}${ownPreset?.label ?? "空き"} ${timeLabel}`
                     : visibleLabel;
-                  return <span key={`${m.id}-${slot.id}`} className={cn("max-w-full truncate rounded border px-1 text-[10px] leading-4", isDraft && "border-dashed opacity-75")} style={{ borderColor: ownPreset?.color ?? (m.id === currentUserId ? "#a3a3a3" : m.color) }} title={titleLabel}>{visibleLabel}</span>;
+                  return <span key={`${m.id}-${slot.id}`} className={cn("max-w-full truncate rounded border px-1 text-xs leading-4", isDraft && "border-dashed opacity-75")} style={{ borderColor: ownPreset?.color ?? (m.id === currentUserId ? "var(--muted-foreground)" : m.color) }} title={titleLabel}>{visibleLabel}</span>;
                 })}
-                {prioritizedSlots.length > chips.length && <span className="text-[10px] text-muted-foreground">+{prioritizedSlots.length - chips.length}</span>}
+                {prioritizedSlots.length > chips.length && <span className="text-xs text-muted-foreground">+{prioritizedSlots.length - chips.length}</span>}
               </div>
             </div>
           );

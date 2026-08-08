@@ -157,7 +157,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
 
       <div className="mx-auto max-w-3xl p-4 md:p-6">
         {/* Member selection */}
-        <div className="mb-4 rounded-xl border bg-background p-3 shadow-sm">
+        <div className="mb-4 rounded-xl border bg-card p-3 shadow-sm">
           <h2 className="mb-2 text-xs font-semibold text-muted-foreground">メンバーを選択</h2>
           <div className="flex flex-wrap gap-x-4 gap-y-1.5">
             {members.map((member) => (
@@ -184,14 +184,14 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
         </div>
 
         {loading && (
-          <div className="mb-4 flex items-center justify-center gap-2 rounded-lg border bg-background p-4 text-sm shadow-sm">
+          <div className="mb-4 flex items-center justify-center gap-2 rounded-lg border bg-card p-4 text-sm shadow-sm">
             <span className="size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-foreground" aria-hidden="true" />
             読み込み中…
           </div>
         )}
 
         {!loading && selectedIds.size === 0 && (
-          <div className="rounded-xl border border-dashed bg-background p-8 text-center text-sm text-muted-foreground shadow-sm">
+          <div className="rounded-xl border border-dashed bg-card p-8 text-center text-sm text-muted-foreground shadow-sm">
             メンバーを選択してください
           </div>
         )}
@@ -201,7 +201,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
             {/* Availability slots list */}
             <div className="space-y-2">
               {totalWindows === 0 && (
-                <div className="rounded-xl border border-dashed bg-background p-6 text-center text-sm text-muted-foreground shadow-sm">
+                <div className="rounded-xl border border-dashed bg-card p-6 text-center text-sm text-muted-foreground shadow-sm">
                   この週に全員が空いている時間帯はありません
                 </div>
               )}
@@ -210,11 +210,11 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
                 const today = isToday(day);
                 if (wins.length === 0 && totalWindows > 0) return null;
                 return (
-                  <div key={date} className="rounded-xl border bg-background shadow-sm">
+                  <div key={date} className="rounded-xl border bg-card shadow-sm">
                     <div className={`flex items-baseline gap-2 border-b px-3 py-2 ${today ? "bg-primary/5" : ""}`}>
                       <span className="text-sm font-semibold">{format(day, "M/d", { locale: ja })}</span>
                       <span className="text-xs text-muted-foreground">{format(day, "EEEE", { locale: ja })}</span>
-                      {today && <span className="rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">今日</span>}
+                      {today && <span className="rounded-full bg-primary px-1.5 py-0.5 text-xs font-medium text-primary-foreground">今日</span>}
                       <span className="ml-auto text-xs text-muted-foreground">
                         {wins.length > 0 ? `${wins.length}件の候補` : "空きなし"}
                       </span>
@@ -237,7 +237,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
                               }`}
                             >
                               <div className="flex min-w-0 flex-1 items-center gap-2">
-                                <span className={`size-2 shrink-0 rounded-full ${isSelected ? "bg-primary" : "bg-emerald-500"}`} />
+                                <span className={`size-2 shrink-0 rounded-full ${isSelected ? "bg-primary" : "bg-success"}`} />
                                 <span className="text-sm font-medium">
                                   {minutesToTime(win.start)}–{minutesToTime(win.end)}
                                 </span>
@@ -255,7 +255,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
             </div>
 
             {/* Event creation panel */}
-            <div className="rounded-xl border bg-background p-4 shadow-sm md:sticky md:top-4">
+            <div className="rounded-xl border bg-card p-4 shadow-sm md:sticky md:top-4">
               <div className="mb-4 flex items-center gap-2">
                 <CalendarPlus className="size-4 text-primary" />
                 <h2 className="font-semibold">イベント作成</h2>
@@ -284,7 +284,7 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
                           const [h, m] = e.target.value.split(":").map(Number);
                           setPicked({ date: picked.date, start: h * 60 + m });
                         }}
-                        className="w-full rounded-lg border bg-background px-3 py-2 text-sm"
+                        className="w-full rounded-lg border bg-card px-3 py-2 text-sm"
                       >
                         {startsInWindow(picked.date, pickedWindow).map((t) => (
                           <option key={t} value={t}>{t}</option>
