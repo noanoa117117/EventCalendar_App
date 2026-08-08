@@ -161,7 +161,7 @@ base64 -w0 service-account.json
 
 ## 8. Supabaseフリープランの自動休止対策
 
-Supabaseフリープランは1週間APIアクセスがないとプロジェクトが自動休止します。`.github/workflows/keep-supabase-alive.yml` が毎日UTC 03:00（JST 12:00）に`GET /rest/v1/profiles?select=id&limit=1`をanon keyで送り、休止を防ぎます。`workflow_dispatch`で手動実行もできます。`curl --fail-with-body`により、2xx以外のレスポンスはボディ付きでログに出力してジョブを失敗させます。
+Supabaseフリープランは1週間APIアクセスがないとプロジェクトが自動休止します。`.github/workflows/keep-supabase-alive.yml` が毎日UTC 03:00（JST 12:00）に`GET /rest/v1/profiles?select=id&limit=1`をanon keyで送り、休止を防ぎます。`workflow_dispatch`で手動実行もできます。HTTPステータスをログへ出力し、200〜299以外はレスポンス本文（`sb_`で始まる文字列は`[REDACTED]`に置換）を出力してジョブを失敗させます。
 
 GitHubリポジトリの `Settings > Secrets and variables > Actions` に以下を登録してください（`.env.local`と同じ値）。
 

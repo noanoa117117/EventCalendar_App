@@ -135,7 +135,7 @@
 ### Supabaseフリープラン休止対策（2026-08-08）
 
 - **変更理由**: Supabaseフリープランは1週間APIアクセスがないとプロジェクトが自動休止する。
-- **実装**: `.github/workflows/keep-supabase-alive.yml` を追加。毎日UTC 03:00（JST 12:00）のcronと手動`workflow_dispatch`で、`GET /rest/v1/profiles?select=id&limit=1`をanon keyで送る。secretは`run:`へ直接展開せず`env:`経由で渡す。`curl --fail-with-body`により2xx以外はボディ付きでログ出力しつつジョブを失敗させる。
+- **実装**: `.github/workflows/keep-supabase-alive.yml` を追加。毎日UTC 03:00（JST 12:00）のcronと手動`workflow_dispatch`で、`GET /rest/v1/profiles?select=id&limit=1`をanon keyで送る。secretは`run:`へ直接展開せず`env:`経由で渡す。HTTPステータスをログへ出力し、200〜299以外はレスポンス本文（`sb_`で始まる文字列を`[REDACTED]`に置換）を出力してジョブを失敗させる。
 - **必要な設定（未確認）**: GitHubリポジトリのSecretsに`SUPABASE_URL`・`SUPABASE_ANON_KEY`を登録する必要がある。登録有無・初回実行結果はこのファイルでは未記録。
 
 ### 直近のUI修正
