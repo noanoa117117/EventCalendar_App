@@ -21,7 +21,8 @@ export function AppHeader({
   onBeforeNavigate?: () => boolean;
 }) {
   return (
-    <header className="flex flex-wrap items-center justify-between gap-2 border-b bg-background px-3 py-2 shadow-sm md:gap-3 md:px-8 md:py-3">
+    <header className="glass-nav sticky top-0 z-10 flex flex-wrap items-center justify-between gap-2 px-3 py-2 md:gap-3 md:px-8 md:py-3">
+      <div className="flex w-full flex-wrap items-center justify-between gap-2 md:contents">
       <nav className="grid w-full grid-cols-3 gap-1 rounded-lg bg-muted/60 p-1 text-sm md:flex md:w-auto md:bg-transparent md:p-0" aria-label="メインナビゲーション">
         {pages.map((p) =>
           p.key === current ? (
@@ -42,7 +43,8 @@ export function AppHeader({
           ),
         )}
       </nav>
-      {children && <div className="flex w-full items-center justify-end gap-2 md:w-auto">{children}</div>}
+      {children && <div className="relative z-10 flex w-full items-center justify-end gap-2 md:w-auto">{children}</div>}
+      </div>
     </header>
   );
 }

@@ -146,6 +146,25 @@
 - **実装**: `.github/workflows/keep-supabase-alive.yml` を追加。毎日UTC 03:00（JST 12:00）のcronと手動`workflow_dispatch`で、`GET /rest/v1/profiles?select=id&limit=1`をanon keyで送る。secretは`run:`へ直接展開せず`env:`経由で渡す。HTTPステータスをログへ出力し、200〜299以外はレスポンス本文（`sb_`で始まる文字列を`[REDACTED]`に置換）を出力してジョブを失敗させる。
 - **必要な設定（未確認）**: GitHubリポジトリのSecretsに`SUPABASE_URL`・`SUPABASE_ANON_KEY`を登録する必要がある。登録有無・初回実行結果はこのファイルでは未記録。
 
+### 夜のビーチ演出リファクタリング（2026-08-08・実装途中）
+
+- **変更理由**: ヘッダーとその下の装飾領域が別々のSVGパネルとして描画され、PCの横長領域で月が切れる・星が見えない・海と砂浜が見えない・ヤシの木が黒い突起になるなどの問題があった。1つの1200×280 SVGを`slice`で極端に横長に引き伸ばす方式を廃止し、CSSグラデーション＋独立SVGレイヤーに分離した。
+- **変更ファイル**: `src/components/night-beach-scene.tsx`（完全書き換え: `NightBeachScene`を`NightSky`+`BeachScene`に分離）、`src/components/app-header.tsx`（border-b/shadow-sm/bg-background削除、night-sky-bgクラス追加）、`src/app/events/event-calendar.tsx`（BeachScene使用、イベント作成ボタンをツールバー移動、max-w-7xl→max-w-[1400px]）、`src/app/globals.css`（旧.night-beach-scene CSS全削除、新.night-sky/.beach-scene CSS追加、--border opacity 18%→22%、シーントークン再設計）、`tests/night-beach-theme.test.ts`（8テストに書き換え）、`tsconfig.json`（browser-ai-bundleをexclude追加）。
+- **新しいコンポーネント構造**:
+  - `NightSky`: CSSグラデーション背景（`night-sky-bg`クラス）＋2層のCSSradial-gradient星レイヤー（twinkleアニメーション付き）。ヘッダー内に配置。海・砂浜・ヤシの木・月なし。
+  - `BeachScene`: CSSグラデーション（`--scene-horizon`→`--scene-sea-far`→`--scene-sea-near`→`--scene-sand-color`→`--background`）で空から海→砂浜→ページ背景へシームレス遷移。波はCSS`linear-gradient`の1px線＋`drift`アニメーション。砂浜はCSS粒テクスチャ＋`border-radius`で岸のカーブ。泡（wash）は`beach-wash`アニメーション。ヤシの木は独立SVG（`preserveAspectRatio="xMidYMax meet"`）で2本、`clamp()`で高さ制御、モバイルでは非表示。
+- **月の完全削除**: `radialGradient id="...moon"`、`circle cx="930"`、`circle cx="943"` をSVGから削除（CSSで非表示にしただけではない）。
+- **イベント作成ボタン移動**: カレンダー上部ツールバーの右側（月/週切り替えの左隣）へ移動。PCでは`hidden @3xl:inline-flex`、モバイルではツールバー下の専用行に配置。管理ボタンも同じ位置にまとめた。
+- **配色調整**: `--border` opacity 18%→22%で罫線を見やすく。
+- **PC装飾領域の高さ**: `clamp(6rem, 7vw, 8rem)` ≈ 96〜128px。モバイル: `clamp(3.5rem, 10vw, 4.5rem)` ≈ 56〜72px。
+- **検証済み**: `npx tsc --noEmit` 成功、`npx tsx --test tests/night-beach-theme.test.ts` 8件成功、`npx next build` 成功。ブラウザで1920px（フルスクリーン）の目視確認: 夜空→海→砂浜の連続背景、ヤシの木のシルエット（葉〜幹）、月なし、ツールバー内のイベント作成ボタン、カード/背景のコントラスト。
+- **追加検証済み（2回目セッション）**:
+  1. **1366px幅**: iframe埋め込みで目視確認。ヤシの木シルエット（2本）表示、ツールバーにイベント作成ボタン、サイドパネル表示。max-w-[1400px]で適切にフィット。
+  2. **390px（モバイル）**: iframe埋め込みで目視確認。ビーチ領域コンパクト表示、ヤシの木非表示（意図通り）、イベント作成ボタンはツールバー下の専用行に表示、ナビタブ3列グリッド読みやすい。
+  3. **768px（タブレット）**: ヤシの木シルエット表示、ツールバーがflex-wrapで自然に折り返し、サイドパネル表示。
+  4. **他画面への影響**: `/availability`と`/planning`の両方でAppHeaderの夜空グラデーション+星が正常に表示、既存コンテンツへの影響なし。BeachSceneは`/events`にだけ表示される。
+  5. **最終ビルド検証**: `tsc --noEmit` 成功、テスト8件全パス、`next build` 成功。
+
 ### 直近のUI修正
 
 - **空き時間パターン管理の統合（2026-08-08）**: モバイルの横スクロール式パターンレールから、各パターン横の鉛筆ボタンを撤回した。選択用のピル表示は維持し、末尾の単一「パターン管理」ボタンから管理Dialogを開く。Dialogは色・ラベル・時間を一覧表示し、項目選択と「新しいパターンを追加」から既存の `PresetDialog` に移動する。保存・削除は一覧とレールへ直ちに反映し、削除済みの選択パターンは解除する。下書き中・保存中・他人閲覧時の追加/編集/削除禁止と所有者制約は維持する。PC側も同じ管理導線へ統一した。

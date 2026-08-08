@@ -36,6 +36,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-scrim: var(--scrim);
 
   /* --- ドメイン色（このアプリ固有の意味を持つ色） ------------------ */
   /* 予定 = イベント確定 */
@@ -144,30 +145,31 @@
   --row-h: 1.75rem;          /* 週カレンダーの30分行の高さ */
   --pane-min-w: 18rem;       /* ペインが割れる下限幅 */
   --header-h: 3.25rem;
+  --scrim: oklch(0.1 0.02 265 / 45%);
 }
 
 /* ============================================================
    3. ダークテーマ
    ============================================================ */
 .dark {
-  --background: oklch(0.185 0.018 265);
-  --foreground: oklch(0.945 0.008 258);
-  --card: oklch(0.225 0.020 265);
+  --background: oklch(0.145 0.035 255);
+  --foreground: oklch(0.95 0.018 245);
+  --card: oklch(0.205 0.035 255 / 88%);
   --card-foreground: var(--foreground);
-  --popover: oklch(0.235 0.020 265);
+  --popover: oklch(0.205 0.04 258 / 96%);
   --popover-foreground: var(--foreground);
 
   --primary: oklch(0.685 0.155 275);
   --primary-foreground: oklch(0.17 0.02 265);
   --secondary: oklch(0.295 0.035 272);
   --secondary-foreground: oklch(0.94 0.01 258);
-  --muted: oklch(0.275 0.020 265);
-  --muted-foreground: oklch(0.705 0.020 262);
-  --accent: oklch(0.315 0.045 272);
+  --muted: oklch(0.245 0.035 255);
+  --muted-foreground: oklch(0.76 0.025 245);
+  --accent: oklch(0.30 0.07 265);
   --accent-foreground: oklch(0.94 0.01 258);
   --destructive: oklch(0.685 0.175 25);
-  --border: oklch(0.98 0 0 / 12%);
-  --input: oklch(0.98 0 0 / 16%);
+  --border: oklch(0.9 0.04 245 / 22%);
+  --input: oklch(0.9 0.04 245 / 22%);
   --ring: oklch(0.685 0.155 275);
 
   --event: oklch(0.685 0.155 275);
@@ -190,6 +192,7 @@
   --today: oklch(0.685 0.155 275);
   --saturday: oklch(0.72 0.105 240);
   --sunday: oklch(0.73 0.130 22);
+  --scrim: oklch(0.06 0.04 255 / 72%);
 
   /* 暗背景では明度を上げないと沈むので L=0.72 に */
   --member-1: oklch(0.72 0.13 35);
@@ -200,6 +203,214 @@
   --member-6: oklch(0.72 0.13 285);
   --member-7: oklch(0.72 0.13 315);
   --member-8: oklch(0.72 0.13 350);
+}
+
+/* --- Night scene tokens ----------------------------------------- */
+.dark {
+  --scene-sky-top: #080A10;
+  --scene-sky-mid: #0E1219;
+  --scene-sky-low: #131824;
+  --scene-star: oklch(0.96 0.04 90);
+  --scene-silhouette: rgba(5, 10, 18, .92);
+  --scene-line: rgba(255, 255, 255, .06);
+  --scene-line-strong: rgba(255, 255, 255, .12);
+}
+
+/* 1. Sky — fixed background for the whole viewport, does not scroll */
+.scene-sky {
+  position: fixed; inset: 0; z-index: -3;
+  background: linear-gradient(180deg,
+    var(--scene-sky-top) 0%,
+    var(--scene-sky-mid) 40%,
+    var(--scene-sky-low) 72%,
+    #111828 100%);
+  pointer-events: none;
+}
+
+/* 2. Stars — fixed, masked to the upper portion (lower half is sea) */
+.scene-stars, .scene-stars-2 {
+  position: fixed; inset: 0; z-index: -2;
+  pointer-events: none;
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 72%);
+          mask-image: linear-gradient(180deg, #000 0%, #000 50%, transparent 72%);
+}
+.scene-stars {
+  background-image:
+    radial-gradient(1px 1px at 11% 14%, #fff, transparent),
+    radial-gradient(1px 1px at 29% 52%, #fff, transparent),
+    radial-gradient(1.5px 1.5px at 52% 11%, #fff, transparent),
+    radial-gradient(1px 1px at 68% 38%, #fff, transparent),
+    radial-gradient(1.3px 1.3px at 84% 22%, #fff, transparent),
+    radial-gradient(1px 1px at 18% 68%, #fff, transparent),
+    radial-gradient(1px 1px at 42% 28%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 91% 56%, #fff, transparent),
+    radial-gradient(1px 1px at 74% 8%, #fff, transparent),
+    radial-gradient(1px 1px at 6% 42%, #fff, transparent);
+  background-size: 360px 220px;
+  opacity: .45;
+  animation: scene-twinkle 8s ease-in-out infinite;
+}
+.scene-stars-2 {
+  background-image:
+    radial-gradient(1px 1px at 7% 48%, #CFE0FF, transparent),
+    radial-gradient(1.7px 1.7px at 36% 9%, #FFE9B8, transparent),
+    radial-gradient(1px 1px at 62% 64%, #CFE0FF, transparent),
+    radial-gradient(1px 1px at 78% 5%, #fff, transparent),
+    radial-gradient(1.2px 1.2px at 48% 72%, #fff, transparent);
+  background-size: 540px 280px;
+  opacity: .3;
+  animation: scene-twinkle 12s ease-in-out infinite reverse;
+}
+@keyframes scene-twinkle { 0%, 100% { opacity: .22; } 50% { opacity: .52; } }
+
+/* 3. Moon — crescent via box-shadow, fixed top-right */
+.scene-moon {
+  position: fixed; top: 6vh; right: 14vw; z-index: -2;
+  width: 28px; height: 28px; border-radius: 50%;
+  box-shadow: 7px 5px 0 0 #E9E4CF, 0 0 40px 10px rgba(233, 228, 207, .06);
+  opacity: .5;
+  pointer-events: none;
+}
+
+/* 4. Shooting stars — fixed, streak across the sky only */
+.scene-meteor {
+  position: fixed; z-index: -2;
+  width: 110px; height: 1px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, .8));
+  border-radius: 1px; opacity: 0;
+  transform: rotate(20deg);
+  pointer-events: none;
+  animation: scene-shoot 11s linear infinite;
+}
+.scene-meteor::after {
+  content: ""; position: absolute; right: -1px; top: -1px;
+  width: 3px; height: 3px; border-radius: 50%;
+  background: #fff; box-shadow: 0 0 5px 1px rgba(180, 205, 255, .8);
+}
+.scene-meteor.m-a { top: 8%; left: -12%; animation-delay: 2s; }
+.scene-meteor.m-b { top: 22%; left: -20%; width: 80px; animation-delay: 7s; animation-duration: 13s; }
+.scene-meteor.m-c { top: 5%; left: -28%; width: 140px; animation-delay: 14s; animation-duration: 16s; }
+@keyframes scene-shoot {
+  0%   { transform: translate3d(0, 0, 0) rotate(20deg); opacity: 0; }
+  3%   { opacity: .9; }
+  14%  { opacity: .9; }
+  20%  { transform: translate3d(72vw, 20vh, 0) rotate(20deg); opacity: 0; }
+  100% { transform: translate3d(72vw, 20vh, 0) rotate(20deg); opacity: 0; }
+}
+
+/* 5. Sea — fixed at the bottom of the viewport, stays put on scroll */
+.scene-sea {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: -2;
+  height: 28vh;
+  background: linear-gradient(180deg, #0F1826 0%, #0A1018 60%, #110F0B 90%, var(--scene-sky-top) 100%);
+  pointer-events: none;
+  overflow: hidden;
+}
+.scene-sea::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1.5px;
+  background: radial-gradient(50% 100% at 76% 50%, rgba(180, 200, 220, .35), transparent 70%);
+}
+
+/* Moon glitter path (narrow, subtle) */
+.scene-glitter {
+  position: absolute; inset: 0;
+  background: repeating-linear-gradient(180deg,
+    rgba(255, 236, 196, .25) 0 1px,
+    transparent 1px 6px);
+  clip-path: polygon(73% 0, 79% 0, 88% 100%, 64% 100%);
+  -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, .3) 50%, transparent 85%);
+          mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, .3) 50%, transparent 85%);
+  animation: scene-glimmer 5s ease-in-out infinite;
+  opacity: .55;
+}
+@keyframes scene-glimmer {
+  0%, 100% { background-position: 0 0; opacity: .45; }
+  50%      { background-position: 0 3px; opacity: .6; }
+}
+
+/* Sea sheen near the moon */
+.scene-sheen {
+  position: absolute; inset: 0;
+  background: radial-gradient(40% 120% at 76% -6%, rgba(180, 200, 220, .09), transparent 65%);
+}
+
+/* Swells */
+.scene-swell {
+  position: absolute; left: -30%; right: -30%;
+  height: 3rem; border-radius: 50%;
+  border-top: 1px solid rgba(180, 200, 220, .18);
+  opacity: 0;
+  animation: scene-swell 14s linear infinite;
+}
+.scene-swell.s1 { top: 22%; animation-duration: 16s; }
+.scene-swell.s2 { top: 34%; animation-duration: 13s; animation-delay: -5s; }
+.scene-swell.s3 { top: 48%; animation-duration: 18s; animation-delay: -10s; }
+@keyframes scene-swell {
+  0%   { transform: translateY(0) scaleX(1); opacity: 0; }
+  16%  { opacity: .7; }
+  65%  { opacity: .4; }
+  100% { transform: translateY(2rem) scaleX(1.12); opacity: 0; }
+}
+
+/* Wash — wave edge at the sand boundary */
+.scene-wash {
+  position: absolute; left: -5%; right: -5%; bottom: 22%; height: 8px;
+  border-radius: 48% 52% 0 0 / 8px 6px 0 0;
+  background: linear-gradient(180deg, rgba(190, 210, 225, .35), transparent);
+  animation: scene-wash 10s ease-in-out infinite;
+}
+.scene-wash.w2 { bottom: 25%; height: 5px; opacity: .5; animation-duration: 14s; animation-delay: -4s; }
+@keyframes scene-wash {
+  0%, 100% { transform: translateY(3px); opacity: .25; }
+  50%      { transform: translateY(-3px); opacity: .6; }
+}
+
+/* Sand */
+.scene-sand {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 22%;
+  background:
+    radial-gradient(35% 130% at 76% -15%, rgba(180, 200, 220, .08), transparent 60%),
+    radial-gradient(1px 1px at 20% 40%, rgba(255, 240, 220, .05), transparent),
+    radial-gradient(1px 1px at 62% 70%, rgba(255, 240, 220, .04), transparent),
+    linear-gradient(180deg, #110F0B 0%, var(--scene-sky-top) 100%);
+  background-size: 100% 100%, 70px 40px, 90px 50px, 100% 100%;
+  border-radius: 48% 52% 0 0 / 10px 8px 0 0;
+  box-shadow: 0 -1px 0 0 rgba(190, 210, 225, .25);
+}
+
+/* Palm trees */
+.scene-palm { position: absolute; bottom: 0; pointer-events: none; z-index: 1; }
+.scene-palm svg { height: 100%; width: auto; display: block; }
+.scene-palm.p1 { right: 3%; height: clamp(5rem, 8vw, 8.5rem); }
+.scene-palm.p2 { right: 11%; height: clamp(4rem, 6vw, 6.5rem); }
+
+/* Glass navbar */
+.glass-nav {
+  background: rgba(8, 10, 16, .72);
+  backdrop-filter: blur(18px) saturate(1.3);
+  -webkit-backdrop-filter: blur(18px) saturate(1.3);
+  border-bottom: 1px solid var(--scene-line);
+}
+
+/* Page content wrapper — floats above the scene, padded clear of the sea */
+.page-content {
+  position: relative;
+  z-index: 1;
+  padding-bottom: max(28vh, 200px);
+}
+
+/* Mobile: hide palms, reduce swells */
+@media (max-width: 640px) {
+  .scene-palm { display: none; }
+  .scene-swell.s3 { display: none; }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .scene-stars, .scene-stars-2, .scene-meteor { animation: none; }
+  .scene-meteor { display: none; }
+  .scene-glitter, .scene-swell, .scene-wash { animation: none; }
+  .scene-swell { opacity: .45; }
 }
 
 /* ============================================================

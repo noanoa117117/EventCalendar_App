@@ -9,6 +9,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { AppHeader } from "@/components/app-header";
+import { NightScene } from "@/components/night-beach-scene";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
@@ -178,7 +179,8 @@ export function AvailabilityBoard({
 
   const [mobilePanel, setMobilePanel] = useState<"calendar" | "members">("calendar");
   return (
-    <div className={`@container flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col bg-border`}>
+    <div className={`@container flex ${compact ? "h-full min-h-[520px]" : "h-dvh"} flex-col`}>
+      {!compact && <NightScene />}
       {preview && !compact && <div className="bg-warning-soft px-3 py-1.5 text-center text-xs font-medium text-warning-foreground">ローカルモック（Supabaseには接続しません）</div>}
       {!compact && <AppHeader current="availability" onBeforeNavigate={() => !hasDraft || window.confirm("未保存の変更があります。移動しますか？")} />}
       <div className="border-b bg-background px-3 py-2 @lg:hidden">

@@ -31,5 +31,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "Share-AI"]
+  "exclude": ["node_modules", "Share-AI", "browser-ai-bundle"]
 }

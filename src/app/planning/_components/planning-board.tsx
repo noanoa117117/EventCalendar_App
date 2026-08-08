@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { AppHeader } from "@/components/app-header";
+import { NightScene } from "@/components/night-beach-scene";
 
 const durations = [30, 60, 90, 120] as const;
 
@@ -152,10 +153,11 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
   const totalWindows = commonWindows.reduce((sum, d) => sum + d.windows.length, 0);
 
   return (
-    <main className="min-h-dvh bg-muted/20">
+    <main className="min-h-dvh">
+      <NightScene />
       <AppHeader current="planning" />
 
-      <div className="mx-auto max-w-3xl p-4 md:p-6">
+      <div className="page-content mx-auto max-w-3xl p-4 md:p-6">
         {/* Member selection */}
         <div className="mb-4 rounded-xl border bg-card p-3 shadow-sm">
           <h2 className="mb-2 text-xs font-semibold text-muted-foreground">メンバーを選択</h2>
