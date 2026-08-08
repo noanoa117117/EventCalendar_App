@@ -1,9 +1,16 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Pencil } from "lucide-react";
+import { Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Toggle } from "@/components/ui/toggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { PresetDialog } from "./preset-dialog";
 import { formatTimeLabel } from "@/lib/availability";
 import type { Preset } from "@/lib/types";
@@ -35,14 +42,24 @@ export function PresetPanel({
 }) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Preset | null>(null);
+  const [managerOpen, setManagerOpen] = useState(false);
+  const [returnToManager, setReturnToManager] = useState(false);
 
-  function openNew() {
+  function openManager() {
+    setManagerOpen(true);
+  }
+
+  function openNew(fromManager = false) {
     setEditing(null);
+    setReturnToManager(fromManager);
+    if (fromManager) setManagerOpen(false);
     setDialogOpen(true);
   }
 
-  function openEdit(p: Preset) {
+  function openEdit(p: Preset, fromManager = false) {
     setEditing(p);
+    setReturnToManager(fromManager);
+    if (fromManager) setManagerOpen(false);
     setDialogOpen(true);
   }
 
@@ -60,16 +77,55 @@ export function PresetPanel({
   }
 
   const dialog = (
-    <PresetDialog
-      open={dialogOpen}
-      onOpenChange={setDialogOpen}
-      userId={userId}
-      preset={editing}
-      nextSortOrder={presets.length}
-      onSaved={handleSaved}
-      onDeleted={handleDeleted}
-      preview={preview}
-    />
+    <>
+      <PresetDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open && returnToManager) setManagerOpen(true);
+        }}
+        userId={userId}
+        preset={editing}
+        nextSortOrder={presets.length}
+        onSaved={handleSaved}
+        onDeleted={handleDeleted}
+        preview={preview}
+      />
+      <Dialog open={managerOpen} onOpenChange={setManagerOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>パターン管理</DialogTitle>
+            <DialogDescription>パターンの追加・編集を行います。</DialogDescription>
+          </DialogHeader>
+          <div className="max-h-[min(60vh,24rem)] space-y-1 overflow-y-auto">
+            {presets.map((p) => {
+              const editable = canEdit && p.user_id === userId;
+              return (
+                <button
+                  key={p.id}
+                  type="button"
+                  disabled={!editable}
+                  onClick={() => openEdit(p, true)}
+                  title={!editable ? editDisabledHint : undefined}
+                  className="flex w-full items-center gap-3 rounded-lg border px-3 py-2 text-left transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <span className="size-3 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
+                  <span className="min-w-0 flex-1 truncate text-sm font-medium">{p.label}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {formatTimeLabel(p.start_time)}–{formatTimeLabel(p.end_time, true)}
+                  </span>
+                </button>
+              );
+            })}
+            {presets.length === 0 && <p className="text-sm text-muted-foreground">パターンがありません</p>}
+          </div>
+          {!canEdit && editDisabledHint && <p className="text-xs text-muted-foreground" role="status">{editDisabledHint}</p>}
+          <Button type="button" onClick={() => openNew(true)} disabled={!canEdit} className="w-full">
+            新しいパターンを追加
+          </Button>
+        </DialogContent>
+      </Dialog>
+    </>
   );
   const isHorizontalRail = horizontal;
 
@@ -85,10 +141,6 @@ export function PresetPanel({
                 パターンを選び、日付をタップ
               </p>
             </div>
-            <Button size="sm" variant="outline" onClick={openNew} disabled={!canEdit} aria-label="空き時間パターンを追加" className="shrink-0 gap-1">
-              <Plus className="h-3.5 w-3.5" />
-              <span>追加</span>
-            </Button>
           </div>
           {!canEdit && editDisabledHint && (
             <p className="hidden text-xs text-muted-foreground md:block" role="status">
@@ -121,32 +173,16 @@ export function PresetPanel({
                       {formatTimeLabel(p.start_time)}–{formatTimeLabel(p.end_time, true)}
                     </span>
                   </button>
-                  <Button
-                    size="icon"
-                    variant="ghost"
-                    className="h-8 w-8 shrink-0"
-                    onClick={() => openEdit(p)}
-                    disabled={!canEdit || p.user_id !== userId}
-                    aria-label={`${p.label}を編集`}
-                  >
-                    <Pencil className="h-3.5 w-3.5" />
-                  </Button>
                 </div>
               );
             })}
             {presets.length === 0 && (
               <p className="text-sm text-muted-foreground">パターンがありません</p>
             )}
-            <button
-              type="button"
-              onClick={openNew}
-              disabled={!canEdit}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
-              aria-label="パターンを追加"
-            >
-              <Plus className="size-4" />
-              追加
-            </button>
+            <Button type="button" variant="outline" onClick={openManager} className="w-full gap-1.5" aria-label="パターン管理">
+              <Settings2 className="size-4" />
+              パターン管理
+            </Button>
           </div>}
 
           {/* Desktop: vertical list */}
@@ -169,16 +205,6 @@ export function PresetPanel({
                     </span>
                   </span>
                 </Toggle>
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8 shrink-0"
-                  onClick={() => openEdit(p)}
-                  disabled={!canEdit || p.user_id !== userId}
-                  aria-label={`${p.label}を編集`}
-                >
-                  <Pencil className="h-3.5 w-3.5" />
-                </Button>
               </li>
             ))}
             {presets.length === 0 && (
@@ -188,16 +214,17 @@ export function PresetPanel({
             )}
             {isHorizontalRail && (
               <li className="shrink-0">
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={openNew}
-                  disabled={!canEdit}
-                  aria-label="空き時間パターンを追加"
-                  className="h-full gap-1"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>追加</span>
+                <Button size="sm" variant="outline" onClick={openManager} aria-label="パターン管理" className="h-full gap-1">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  <span>パターン管理</span>
+                </Button>
+              </li>
+            )}
+            {!isHorizontalRail && (
+              <li className="shrink-0">
+                <Button size="sm" variant="outline" onClick={openManager} aria-label="パターン管理" className="gap-1">
+                  <Settings2 className="h-3.5 w-3.5" />
+                  パターン管理
                 </Button>
               </li>
             )}
@@ -212,10 +239,6 @@ export function PresetPanel({
     <div className="flex h-full flex-col gap-2 md:gap-3">
       <div className="hidden items-center justify-between gap-2 md:flex">
         <h2 className="text-sm font-semibold text-muted-foreground">空き時間パターン</h2>
-        <Button size="sm" variant="outline" onClick={openNew} disabled={!canEdit} aria-label="空き時間パターンを追加" className="shrink-0 gap-1">
-          <Plus className="h-3.5 w-3.5" />
-          <span>追加</span>
-        </Button>
       </div>
       <p className="hidden text-xs text-muted-foreground md:block">
         パターンを選び、日付をタップして空き時間を登録
@@ -253,32 +276,17 @@ export function PresetPanel({
                 <span className="size-2 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
                 <span className="truncate">{p.label}</span>
               </button>
-              <Button
-                type="button"
-                size="icon"
-                variant="ghost"
-                className="h-11 w-11 shrink-0"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  openEdit(p);
-                }}
-                disabled={!canEdit || p.user_id !== userId}
-                aria-label={`${p.label}を編集`}
-              >
-                <Pencil className="h-3.5 w-3.5" />
-              </Button>
             </div>
           );
         })}
         <button
           type="button"
-          onClick={openNew}
-          disabled={!canEdit}
+          onClick={openManager}
           className="flex min-h-11 shrink-0 items-center gap-1 rounded-full border border-dashed px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
-          aria-label="パターンを追加"
+          aria-label="パターン管理"
         >
-          <Plus className="size-3.5" />
-          追加
+          <Settings2 className="size-3.5" />
+          パターン管理
         </button>
       </div>
 
@@ -300,16 +308,6 @@ export function PresetPanel({
                 </span>
               </span>
             </Toggle>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 shrink-0"
-              onClick={() => openEdit(p)}
-              disabled={!canEdit || p.user_id !== userId}
-              aria-label={`${p.label}を編集`}
-            >
-              <Pencil className="h-3.5 w-3.5" />
-            </Button>
           </li>
         ))}
         {presets.length === 0 && (
@@ -317,6 +315,12 @@ export function PresetPanel({
             空き時間パターンがありません。追加してください。
           </li>
         )}
+        <li>
+          <Button type="button" variant="outline" onClick={openManager} aria-label="パターン管理" className="w-full gap-1">
+            <Settings2 className="h-3.5 w-3.5" />
+            パターン管理
+          </Button>
+        </li>
       </ul>
 
       {dialog}

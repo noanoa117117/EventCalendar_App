@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
+import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
@@ -22,7 +22,6 @@ import {
   jstNow,
   monthGridRange,
   registrableWindow,
-  weekRange,
   applyAvailabilityOperations,
 } from "@/lib/availability";
 import type { AvailabilityOperation } from "@/lib/availability";
@@ -30,7 +29,6 @@ import type { Preset, Profile, Slot } from "@/lib/types";
 import { MemberList } from "./member-list";
 import { PresetPanel } from "./preset-panel";
 import { MonthCalendar } from "./month-calendar";
-import { WeekCalendar } from "./week-calendar";
 
 export function AvailabilityBoard({
   currentUser,
@@ -49,7 +47,6 @@ export function AvailabilityBoard({
   compact?: boolean;
   onAvailabilityChanged?: () => void;
 }) {
-  const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [cursorDate, setCursorDate] = useState<Date>(() => jstNow());
   const [visibleIds, setVisibleIds] = useState<Set<string>>(
     () => new Set([currentUser.id]),
@@ -81,10 +78,7 @@ export function AvailabilityBoard({
   const canActivatePreset = editing && selfVisible;
   const activePreset = canActivatePreset ? presets.find((p) => p.id === activePresetId) ?? null : null;
 
-  const range = useMemo(
-    () => (viewMode === "month" ? monthGridRange(cursorDate) : weekRange(cursorDate)),
-    [viewMode, cursorDate],
-  );
+  const range = useMemo(() => monthGridRange(cursorDate), [cursorDate]);
 
   const fetchSlots = useCallback(async () => {
     if (preview) return;
@@ -143,16 +137,6 @@ export function AvailabilityBoard({
     setDraftOps((prev) => [...prev, { dates, start: preset.start_time, end: preset.end_time, active: action === "apply", presetId: action === "apply" ? preset.id : null }]);
   }
 
-  function handleWeekDragCommit(
-    date: string,
-    start: string,
-    end: string,
-    action: "apply" | "remove",
-  ) {
-    if (!editing || !selfVisible) return;
-    setDraftOps((prev) => [...prev, { dates: [date], start, end, active: action === "apply", presetId: null }]);
-  }
-
   function stageDeleteMonth() {
     if (!editing || !selfVisible || confirming || deletableMonthDates.length === 0) return;
     setDraftOps((prev) => [
@@ -181,19 +165,16 @@ export function AvailabilityBoard({
   }, [hasDraft]);
 
   function goPrev() {
-    setCursorDate((d) => (viewMode === "month" ? addMonths(d, -1) : addWeeks(d, -1)));
+    setCursorDate((d) => addMonths(d, -1));
   }
   function goNext() {
-    setCursorDate((d) => (viewMode === "month" ? addMonths(d, 1) : addWeeks(d, 1)));
+    setCursorDate((d) => addMonths(d, 1));
   }
   function goToday() {
     setCursorDate(jstNow());
   }
 
-  const title =
-    viewMode === "month"
-      ? format(cursorDate, "yyyy年M月", { locale: ja })
-      : `${format(range.start, "M/d", { locale: ja })} - ${format(range.end, "M/d", { locale: ja })}`;
+  const title = format(cursorDate, "yyyy年M月", { locale: ja });
 
   const [mobilePanel, setMobilePanel] = useState<"calendar" | "members">("calendar");
   return (
@@ -204,12 +185,6 @@ export function AvailabilityBoard({
         <div className="flex items-center gap-2">
           <Tabs value={mobilePanel} onValueChange={(v) => setMobilePanel(v as typeof mobilePanel)} className="flex-1">
             <TabsList className="grid w-full grid-cols-2"><TabsTrigger value="calendar">カレンダー</TabsTrigger><TabsTrigger value="members">メンバー</TabsTrigger></TabsList>
-          </Tabs>
-          <Tabs className="shrink-0" value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "week")}>
-            <TabsList>
-              <TabsTrigger value="month">月</TabsTrigger>
-              <TabsTrigger value="week">週</TabsTrigger>
-            </TabsList>
           </Tabs>
         </div>
       </div>
@@ -245,13 +220,7 @@ export function AvailabilityBoard({
               {loading && <span className="text-xs text-muted-foreground">更新中...</span>}
               {!editing && <Button className="shrink-0" size="sm" variant="outline" disabled={!selfVisible} onClick={() => setEditing(true)}>編集する</Button>}
               {editing && <span className="text-xs text-warning-foreground">{hasDraft ? `未保存の変更あり (${draftOps.length})` : "編集モード"}</span>}
-              {editing && <div className="contents">{viewMode === "month" && <Button className="shrink-0" size="sm" variant="destructive" disabled={!selfVisible || confirming || deletableMonthDates.length === 0} onClick={() => setDeleteMonthDialogOpen(true)}>この月を全削除</Button>}<Button className="shrink-0" size="sm" disabled={!hasDraft || confirming} onClick={confirmDraft}>{confirming ? "保存中…" : "変更を確定"}</Button><Button className="shrink-0" size="sm" variant="ghost" disabled={confirming} onClick={cancelDraft}>取り消す</Button></div>}
-              <Tabs className="hidden shrink-0 @lg:block" value={viewMode} onValueChange={(v) => setViewMode(v as "month" | "week")}>
-                <TabsList>
-                  <TabsTrigger value="month">月</TabsTrigger>
-                  <TabsTrigger value="week">週</TabsTrigger>
-                </TabsList>
-              </Tabs>
+              {editing && <div className="contents"><Button className="shrink-0" size="sm" variant="destructive" disabled={!selfVisible || confirming || deletableMonthDates.length === 0} onClick={() => setDeleteMonthDialogOpen(true)}>この月を全削除</Button><Button className="shrink-0" size="sm" disabled={!hasDraft || confirming} onClick={confirmDraft}>{confirming ? "保存中…" : "変更を確定"}</Button><Button className="shrink-0" size="sm" variant="ghost" disabled={confirming} onClick={cancelDraft}>取り消す</Button></div>}
             </div>
           </div>
         </div>
@@ -287,31 +256,18 @@ export function AvailabilityBoard({
         )}
 
         <div className="relative min-h-0 flex-1 overflow-hidden">
-          {viewMode === "month" ? (
-            <MonthCalendar
-              cursorDate={cursorDate}
-              members={members}
-              visibleIds={visibleIds}
-              currentUserId={currentUser.id}
-              slots={projectedSlots}
-              activePreset={activePreset}
-              presets={presets}
-              canEdit={editing && selfVisible}
-              window={editableWindow}
-              onPaint={handlePaint}
-            />
-          ) : (
-            <WeekCalendar
-              cursorDate={cursorDate}
-              members={members}
-              visibleIds={visibleIds}
-              currentUserId={currentUser.id}
-              slots={projectedSlots}
-              window={editableWindow}
-              onDragCommit={handleWeekDragCommit}
-              canEdit={editing && selfVisible}
-            />
-          )}
+          <MonthCalendar
+            cursorDate={cursorDate}
+            members={members}
+            visibleIds={visibleIds}
+            currentUserId={currentUser.id}
+            slots={projectedSlots}
+            activePreset={activePreset}
+            presets={presets}
+            canEdit={editing && selfVisible}
+            window={editableWindow}
+            onPaint={handlePaint}
+          />
           {loading && (
             <div
               className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"

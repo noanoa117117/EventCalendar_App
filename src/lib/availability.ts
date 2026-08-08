@@ -1,5 +1,4 @@
 import {
-  addDays,
   endOfMonth,
   endOfWeek,
   startOfMonth,
@@ -44,12 +43,6 @@ export function monthGridRange(date: Date): { start: Date; end: Date } {
     start: startOfWeek(startOfMonth(date), { weekStartsOn: 0 }),
     end: endOfWeek(endOfMonth(date), { weekStartsOn: 0 }),
   };
-}
-
-export function weekRange(date: Date): { start: Date; end: Date } {
-  // Match the event calendar's weekly view: Monday through Sunday.
-  const start = startOfWeek(date, { weekStartsOn: 1 });
-  return { start, end: addDays(start, 6) };
 }
 
 export interface TimeRange {
@@ -167,41 +160,6 @@ export function formatTimeLabel(time: string, isEnd = false) {
   const hhmm = time.slice(0, 5);
   if (isEnd && hhmm === "00:00") return "24:00";
   return hhmm;
-}
-
-export interface AvailabilitySummaryRange {
-  start: string;
-  end: string;
-}
-
-/**
- * Convert stored availability ranges into the compact, human-readable ranges
- * used by the mobile weekly list.  The database normally stores normalized
- * rows, but drafts and legacy rows can still be adjacent or overlapping, so
- * merge them here as well.  This function is deliberately data-only: JST
- * calendar-day selection happens at the caller and `00:00` is rendered as the
- * end-of-day label only when it is an end value.
- */
-export function summarizeAvailabilityRanges(ranges: TimeRange[]): AvailabilitySummaryRange[] {
-  const intervals = ranges
-    .map((range) => ({ start: startMinutes(range.start_time), end: endMinutes(range.end_time) }))
-    .filter((range) => range.end > range.start)
-    .sort((a, b) => a.start - b.start || a.end - b.end);
-  const merged: Array<{ start: number; end: number }> = [];
-
-  for (const interval of intervals) {
-    const previous = merged.at(-1);
-    if (previous && interval.start <= previous.end) {
-      previous.end = Math.max(previous.end, interval.end);
-    } else {
-      merged.push({ ...interval });
-    }
-  }
-
-  return merged.map((range) => ({
-    start: minutesToTime(range.start),
-    end: formatTimeLabel(minutesToTime(range.end), true),
-  }));
 }
 
 /** Expand stored ranges into unique, half-open 30-minute cells in memory. */
