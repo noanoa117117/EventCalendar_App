@@ -216,7 +216,7 @@ export function AvailabilityBoard({
             </Button>
             </div>
             <div className="hidden min-w-0 basis-full @lg:block @lg:flex-1"><h1 className="text-sm font-semibold">空き時間を登録・確認</h1><p className="text-xs text-muted-foreground">あなたの空き時間を登録し、選択したメンバーの空き時間を確認できます。</p><p className="text-xs text-muted-foreground">{title}</p></div>
-            <div className="flex w-full flex-wrap items-center gap-1 @lg:w-auto">
+            <div className={`flex min-w-0 items-center gap-1 ${editing ? "w-full flex-wrap @lg:w-auto" : "ml-auto shrink-0"}`}>
               {loading && <span className="text-xs text-muted-foreground">更新中...</span>}
               {!editing && <Button className="shrink-0" size="sm" variant="outline" disabled={!selfVisible} onClick={() => setEditing(true)}>編集する</Button>}
               {editing && <span className="text-xs text-warning-foreground">{hasDraft ? `未保存の変更あり (${draftOps.length})` : "編集モード"}</span>}
