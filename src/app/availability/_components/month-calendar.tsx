@@ -191,14 +191,35 @@ export function MonthCalendar({
                 {chips.map(({ member: m, slot }) => {
                   const ownPreset = m.id === currentUserId ? presets.find((p) => p.id === slot.preset_id) : undefined;
                   const isDraft = slot.id.startsWith("draft-");
-                  const timeLabel = `${formatTimeLabel(slot.start_time)}–${formatTimeLabel(slot.end_time, true)}`;
+                  const startTime = formatTimeLabel(slot.start_time);
+                  const endTime = formatTimeLabel(slot.end_time, true);
+                  const isAllDay = startTime === "00:00" && endTime === "24:00";
+                  const timeLabel = isAllDay ? "終日" : `${startTime}〜${endTime}`;
                   const visibleLabel = m.id === currentUserId
                     ? `${isDraft ? "未確定 " : ""}${timeLabel}`
                     : `${m.nickname} ${timeLabel}`;
                   const titleLabel = m.id === currentUserId
                     ? `${isDraft ? "未確定 " : ""}${ownPreset?.label ?? "空き"} ${timeLabel}`
                     : visibleLabel;
-                  return <span key={`${m.id}-${slot.id}`} className={cn("max-w-full truncate rounded border px-1 text-xs leading-4", isDraft && "border-dashed opacity-75")} style={{ borderColor: ownPreset?.color ?? (m.id === currentUserId ? "var(--muted-foreground)" : m.color) }} title={titleLabel}>{visibleLabel}</span>;
+                  return (
+                    <span
+                      key={`${m.id}-${slot.id}`}
+                      className={cn("flex min-w-0 max-w-full flex-col items-center rounded border px-1 py-0.5 text-center text-[10px] leading-[1.1]", isDraft && "border-dashed opacity-75")}
+                      style={{ borderColor: ownPreset?.color ?? (m.id === currentUserId ? "var(--muted-foreground)" : m.color) }}
+                      title={titleLabel}
+                    >
+                      {m.id !== currentUserId && <span className="w-full truncate">{m.nickname}</span>}
+                      {isDraft && <span>未確定</span>}
+                      {isAllDay ? (
+                        <span className="whitespace-nowrap">終日</span>
+                      ) : (
+                        <span className="flex flex-col items-center whitespace-nowrap leading-none">
+                          <span>{startTime}</span>
+                          <span>〜{endTime}</span>
+                        </span>
+                      )}
+                    </span>
+                  );
                 })}
                 {prioritizedSlots.length > chips.length && <span className="text-xs text-muted-foreground">+{prioritizedSlots.length - chips.length}</span>}
               </div>
