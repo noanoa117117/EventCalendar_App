@@ -9,7 +9,7 @@ Next.js 16（App Router）+ Supabase。イベント、空き時間登録、企�
 
 ## 2. DBスキーマを適用する
 
-`supabase/migrations/` の `0001` から `0008` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
+`supabase/migrations/` の `0001` から `0009` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
 
 ```bash
 npx supabase login
@@ -17,7 +17,7 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。`0007_super_user_delete_event.sql` は、キャンセル済みイベントをsuper userが完全削除するRPCを追加します。`0008_google_calendar_sync.sql` は、Google Calendar同期用のステータス列を追加します。
+SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。`0007_super_user_delete_event.sql` は、キャンセル済みイベントをsuper userが完全削除するRPCを追加します。`0008_google_calendar_sync.sql` は、Google Calendar同期用のステータス列を追加します。`0009_active_members_and_admin_nicknames.sql` は、管理一覧のニックネーム取得と、有効な許可ユーザーだけを返すメンバー取得RPCを追加します。
 
 ## 3. ローカル開発・fixture
 
@@ -158,3 +158,14 @@ base64 -w0 service-account.json
 - 同期失敗時はDBイベントは維持し、イベント詳細に同期状態を表示
 - 作成者は「再同期」ボタンで手動再試行が可能
 - 環境変数が未設定の場合、同期は無視される（エラーにならない）
+
+## 8. Supabaseフリープランの自動休止対策
+
+Supabaseフリープランは1週間APIアクセスがないとプロジェクトが自動休止します。`.github/workflows/keep-supabase-alive.yml` が毎日UTC 03:00（JST 12:00）に`GET /rest/v1/`をanon keyで送り、休止を防ぎます。`workflow_dispatch`で手動実行もできます。
+
+GitHubリポジトリの `Settings > Secrets and variables > Actions` に以下を登録してください（`.env.local`と同じ値）。
+
+| Secret名 | 値 |
+| --- | --- |
+| `SUPABASE_URL` | `NEXT_PUBLIC_SUPABASE_URL`と同じ |
+| `SUPABASE_ANON_KEY` | `NEXT_PUBLIC_SUPABASE_ANON_KEY`と同じ |

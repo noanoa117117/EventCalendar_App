@@ -4,13 +4,13 @@
 
 ## 現在地（最初に読む）
 
-**最終更新: 2026-08-07 / Google Calendar同期MVP実装済み。環境変数設定・DB migration適用・デプロイ待ち**
+**最終更新: 2026-08-08 / Google Calendar同期MVP、管理画面のニックネーム表示・有効メンバー判定を実装済み（実Supabase migration適用・デプロイ待ち）。空き時間UIはデザイントークン統一・プリセット管理統合・週表示廃止（月表示のみに変更）を実施**
 
 | 項目 | 状態 | 事実・次の判断 |
 | --- | --- | --- |
 | アプリ機能（Phase 1-6） | 実装済み | 画面①イベント、②空き時間、③企画、管理画面まで実装済み。実Supabase上の総合E2Eは未完了。 |
 | 空き時間の保存 | 実装済み・要DB適用確認 | UIは `set_availability_batch` を呼ぶ。実Supabaseに `0006_batch_availability.sql` が適用済みかを最優先で確認する。 |
-| 管理画面 | 実装済み・要DB適用確認 | UI/RPCは `0005_admin_access_controls.sql` と `0006` を前提にする。実環境では少なくとも `0001`〜`0004` 適用済み。`0005`/`0006` の適用状況は未記録なので、推測で扱わない。 |
+| 管理画面 | 実装済み・要DB適用確認 | UI/RPCは `0005_admin_access_controls.sql`、`0006`、`0009_active_members_and_admin_nicknames.sql` を前提にする。実環境では少なくとも `0001`〜`0004` 適用済み。後続migrationの適用状況は未記録なので、推測で扱わない。 |
 | イベント完全削除 | 実装済み・要DB適用確認 | `0007_super_user_delete_event.sql` 適用後、super userがキャンセル済みイベントを物理削除できる。未キャンセルイベントと一般ユーザーはDB側で拒否する。 |
 | ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
 | Cloudflare Access 認証 | 実装済み・本番未検証 | JWT検証→Supabase allowlist→SSRセッション発行。13テストは成功済み。未許可メールには管理者登録依頼とGoogle再ログインの案内を返す。Cloudflare Dashboard/本番Secretは未設定。 |
@@ -21,7 +21,7 @@
 
 1. トークン交換エラー修正をデプロイし、イベント `8876b115-e0c6-4165-821c-3d62a0b803fb` の再同期で成功を確認する。
 2. Cloudflare DashboardでWorker runtime Variables/Secret、Custom Domain、Access Applicationを設定し、stagingまたは本番前のE2Eを行う。デプロイはユーザー承認後にのみ実施する。
-3. 実Supabaseの migration `0005` / `0006` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
+3. 実Supabaseの migration `0005` / `0006` / `0009` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
 4. 実機E2E（モバイル含む）を行う。ログイン、空き時間の下書き→確定→再読込→削除、他メンバー閲覧、企画、イベント参加、管理画面を確認する。
 
 ### Cloudflare Workersの互換性判断
@@ -48,9 +48,9 @@
 - [x] RPC: `setup_profile`（初回プロフィール+初期プリセット作成、冪等）, `set_availability`（範囲のマージ/分割正規化、登録可能期間チェック）
 - [x] セキュリティ監査修正: プロフィール作成・空き時間更新をRPC経由に限定、編集可能期間をAsia/Tokyoに統一、OAuthの遷移先を同一オリジンのアプリ内パスに限定
 - [x] 認証フロー: Cloudflare Access JWTを検証してSupabase SSRセッションを発行。ホワイトリスト外は `/access-denied`、ニックネーム未設定は `/setup-nickname`
-- [x] 画面②（`/availability`）: 3カラム（メンバー一覧／月・週カレンダー／プリセット）
+- [x] 画面②（`/availability`）: レスポンシブ構成（デスクトップはメンバー一覧／月カレンダー／プリセットの3カラム、モバイルは画面幅に合わせて切替）
   - 月表示: プリセットトグル→日付クリック/ドラッグでペイント登録・解除
-  - 週表示: 30分単位の直接ドラッグ登録
+  - 週表示は後に撤回し、現在はPC・モバイルとも月表示のみ
   - 過去日・登録可能期間（当月+3ヶ月）外は編集不可
   - プリセット追加/編集/削除（削除しても既存の空き時間は変更しない）
 - [x] `npm run build`（型チェック・ESLint込み）通過、`npm run dev` でのスモークテスト確認済み（ログイン画面・アクセス拒否画面のレンダリング）
@@ -68,7 +68,7 @@
 - [x] 操作性・モバイル対応の先行修正
   - イベント編集、主催者表示、参加状態のグループ表示、画面①↔②ナビゲーション
   - モバイルのイベント詳細ボトムシート、空き時間画面のカレンダー／メンバー／プリセット切替
-  - 空き時間ペイントのタッチドラッグ・中断・高速操作、および週表示の指で押せる行高
+  - 空き時間の月ペイントにおけるタッチドラッグ・中断・高速操作
   - 開発プレビューでイベント画面と空き時間画面の両方を確認可能
 - [x] Phase 4（画面③）: 選択メンバーの共通空き時間をJST・30分単位で集計し、候補から30/60/90/120分のイベントを作成
 - [x] Phase 5: 企画／イベント／空き時間を独立した3画面として遷移する導線
@@ -82,13 +82,13 @@
 ## ユーザー側で必要な作業（実環境を変更するもの）
 
 - [x] 実Supabaseプロジェクトを作成し `0001`〜`0004` を番号順に適用
-- [x] `0005_admin_access_controls.sql` / `0006_batch_availability.sql` の実Supabase適用状況を確認し、未適用なら順に適用（適用前に内容を確認する）
+- [ ] `0005_admin_access_controls.sql` / `0006_batch_availability.sql` / `0009_active_members_and_admin_nicknames.sql` の実Supabase適用状況を確認し、未適用なら順に適用（適用前に内容を確認する）
 - [x] `supabase/seed.sql` のメールアドレスを自分のものに書き換えて実行（ホワイトリスト登録）
 - [x] Workers移行完了後、Cloudflare Zero TrustでAccess Applicationを作成し、`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` とサーバー専用の `SUPABASE_SERVICE_ROLE_KEY` をWorkersの環境変数／Secretとして設定
 - [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
-- [x] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
-- [x] 実ブラウザで①→②→③の画面遷移、モバイルでの各画面の操作性、および空き時間更新後の企画候補再集計を確認
-- [x] `0007_super_user_delete_event.sql` の実Supabase適用状況を確認
+- [ ] 実環境でE2E動作確認: ログイン → ニックネーム設定 → ペイント操作 → 他メンバー閲覧切替 → プリセットCRUD → イベント作成／参加表明／編集／キャンセル
+- [ ] 実ブラウザで①→②→③の画面遷移、モバイルでの各画面の操作性、および空き時間更新後の企画候補再集計を確認
+- [ ] `0007_super_user_delete_event.sql` の実Supabase適用状況を確認
 - [ ] `/admin` で許可メール管理・ロール変更を確認
 
 ## 次のフェーズ（未着手）
@@ -132,10 +132,18 @@
 - **残課題**: 公開SupabaseのData APIはCloudflare gatewayの外にある。RLSでanon・未許可ユーザーは拒否するが、この通信経路自体を非公開にするには将来BFF化またはSupabaseの非公開化が必要。
 - **Policy簡略化の確定事項**: Cloudflare Access Policyは `Allow` + `Include: Everyone` + `Require: Login Methods → Google`、ApplicationのIdPはGoogleのみ、Instant authenticationは有効。`Include` にEveryoneとGoogleを併記しない。個別メールの正本は`public.allowed_emails`。
 
+### Supabaseフリープラン休止対策（2026-08-08）
+
+- **変更理由**: Supabaseフリープランは1週間APIアクセスがないとプロジェクトが自動休止する。
+- **実装**: `.github/workflows/keep-supabase-alive.yml` を追加。毎日UTC 03:00（JST 12:00）のcronと手動`workflow_dispatch`で、`NEXT_PUBLIC_SUPABASE_URL`宛に`GET /rest/v1/`をanon keyで送り、HTTPステータスが200〜399以外ならジョブを失敗させる。
+- **必要な設定（未確認）**: GitHubリポジトリのSecretsに`SUPABASE_URL`・`SUPABASE_ANON_KEY`を登録する必要がある。登録有無・初回実行結果はこのファイルでは未記録。
+
 ### 直近のUI修正
 
 - **空き時間パターン管理の統合（2026-08-08）**: モバイルの横スクロール式パターンレールから、各パターン横の鉛筆ボタンを撤回した。選択用のピル表示は維持し、末尾の単一「パターン管理」ボタンから管理Dialogを開く。Dialogは色・ラベル・時間を一覧表示し、項目選択と「新しいパターンを追加」から既存の `PresetDialog` に移動する。保存・削除は一覧とレールへ直ちに反映し、削除済みの選択パターンは解除する。下書き中・保存中・他人閲覧時の追加/編集/削除禁止と所有者制約は維持する。PC側も同じ管理導線へ統一した。
-- **モバイル週表示の方針変更（2026-08-08）**: 以前の3日グリッド案および縦型7日リスト案は撤回し、空き時間画面の週表示そのものを削除した。空き時間はPC・モバイルとも月表示だけを提供し、月移動、メンバー切替、プリセットによるペイント登録、下書き、保存、取消は維持する。週グリッド、日別編集シート、関連ジェスチャー処理と専用テストは削除した。管理画面関連は今回変更せず pending のまま。
+- **モバイル週表示の方針変更（2026-08-08）**: 以前の3日グリッド案および縦型7日リスト案は撤回し、空き時間画面の週表示そのものを削除した。空き時間はPC・モバイルとも月表示だけを提供し、月移動、メンバー切替、プリセットによるペイント登録、下書き、保存、取消は維持する。週グリッド、日別編集シート、関連ジェスチャー処理と専用テストは削除した。この時点では管理画面関連を pending としていたが、後続の「管理画面のニックネームと現行メンバー判定」で対応済み。**最新検証（後続の管理画面修正を含む）**: `npm test` 48件成功、`npm run lint`、`npx tsc --noEmit`、`npm run build`、`npm run build:worker`、`git diff --check` 成功。
+- **空き時間ツールバーの右寄せ修正（2026-08-08）**: `availability-board.tsx` の編集ボタン行が非編集時も `w-full` で全幅に伸び、単独の「編集する」ボタンが間延びして見えていた。非編集時は `ml-auto shrink-0` で右寄せにし、編集時のレイアウトは変更していない。**検証**: `npx tsc --noEmit` 成功。
+- **管理画面のニックネームと現行メンバー判定（2026-08-08）**: 管理者専用の許可メール一覧へニックネーム（未作成・空白は「未設定」）を追加した。`list_active_profiles()` は、profiles・auth.users・有効なallowed_emails・設定済みニックネームを照合し、空き時間と企画の現行メンバー候補を同じ判定へ統一する。許可の削除・無効化後は現行候補から除外し、再許可・有効化後は既存profileを再利用して戻す。profiles、auth.users、既存の空き時間、過去イベント・参加履歴は削除しない。管理RPC・migrationは実装済みだが、実Supabaseへの`0009`適用、本番デプロイ、実機UI確認は未実施。
 - **イベント月表示のモバイル対応**: 7列の月表示ではタイトルを無理に縮めず、確定イベントは色付きドット（4件以上は`+N`）で表示する。タップすると詳細ボトムシートでタイトル・日時・主催者・参加操作を確認できる。週表示では時刻＋タイトルの縦リストを使う。
 - **Cloudflare未許可メールの案内**: `/auth/cloudflare` は403を維持し、allowlist外のGoogleアカウントには管理者への登録依頼と再ログインを促す日本語メッセージを表示する。allowlist照合前の副作用はない。
 - **イベント完全削除**: `0007_super_user_delete_event.sql` とUIを追加。キャンセル済みイベントだけをsuper userが物理削除できる。未キャンセルイベントや一般ユーザーの削除は拒否する。
@@ -156,4 +164,4 @@
 - **ESLintの `react-hooks/set-state-in-effect`**: React 19/Next16のリンタがdata-fetching effectパターンにも反応する。`availability-board.tsx` の一箇所のみ理由コメント付きで意図的にdisable。同種のケースが増える場合はSWR/React Query導入も検討（現状の技術スタックには未採用）。
 - **開発時の認証バイパス**: `src/lib/dev-auth.ts` は `NODE_ENV === "development"` と `DEV_BYPASS_AUTH === "true"` の両方が揃う場合だけ有効。実DBを使うE2Eではこのフラグを使わず、ローカルfixtureまたはCloudflare Accessの許可済みアカウントで確認する。
 - **Phase 5の画面構成**: ルート `/` は正規の画面①である `/events` へリダイレクトする。画面②は `/availability`、画面③は `/planning`。モバイルで3画面を同時表示しない。
-- **管理権限**: `0004_admin_roles.sql` のsecurity-definer RPCが唯一の許可メール／ロール更新経路。`allowed_emails` のテーブル読み取りを復活させてはならない。
+- **管理権限**: 許可メール／ロールの更新は `0005_admin_access_controls.sql` のsecurity-definer RPCだけを経路とする。管理一覧と有効メンバー取得は `0009_active_members_and_admin_nicknames.sql` のsecurity-definer RPCを使う。`allowed_emails` のテーブル読み取りをクライアントへ復活させてはならない。

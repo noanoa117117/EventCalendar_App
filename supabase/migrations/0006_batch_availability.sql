@@ -43,7 +43,7 @@ begin
     if not v_active and (v_op->>'presetId') is not null and (v_op->>'presetId') <> 'null' then raise exception 'remove operations cannot specify a preset'; end if;
     if v_active then
       if v_op->>'presetId' is null or (v_op->>'presetId') = 'null' then
-        -- null presets are valid for weekly freehand painting.
+        -- null presets are valid for manual availability operations.
         null;
       else
         v_preset := (v_op->>'presetId')::uuid;

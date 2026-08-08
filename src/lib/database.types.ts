@@ -13,6 +13,21 @@ export type EventStatus = "published" | "cancelled";
 export type GoogleSyncStatus = "pending" | "synced" | "failed";
 export type AllowedEmailRole = "member" | "admin" | "super_user";
 
+export interface ActiveProfile {
+  id: string;
+  nickname: string;
+  color: string;
+}
+
+export interface ManagedAllowedEmail {
+  id: string;
+  email: string;
+  nickname: string | null;
+  is_enabled: boolean;
+  role: AllowedEmailRole;
+  created_at: string;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -176,7 +191,11 @@ export interface Database {
       is_super_user: { Args: Record<string, never>; Returns: boolean };
       list_managed_allowed_emails: {
         Args: Record<string, never>;
-        Returns: Database["public"]["Tables"]["allowed_emails"]["Row"][];
+        Returns: ManagedAllowedEmail[];
+      };
+      list_active_profiles: {
+        Args: Record<string, never>;
+        Returns: ActiveProfile[];
       };
       manage_allowed_email: {
         Args: { p_email: string; p_role?: AllowedEmailRole; p_enabled?: boolean };

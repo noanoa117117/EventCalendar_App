@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDevAvailabilityData, isDevPreviewEnabled } from "@/lib/dev-auth";
+import type { ActiveProfile } from "@/lib/database.types";
 import { AvailabilityBoard } from "./_components/availability-board";
 
 export default async function AvailabilityPage() {
@@ -24,7 +25,7 @@ export default async function AvailabilityPage() {
         .select("id, nickname, color")
         .eq("id", user.id)
         .single(),
-      supabase.from("profiles").select("id, nickname, color").order("nickname"),
+      supabase.rpc("list_active_profiles"),
       supabase
         .from("availability_presets")
         .select("*")
@@ -37,7 +38,7 @@ export default async function AvailabilityPage() {
   return (
     <AvailabilityBoard
       currentUser={profile}
-      members={members ?? []}
+      members={(members ?? []) as ActiveProfile[]}
       initialPresets={presets ?? []}
     />
   );
