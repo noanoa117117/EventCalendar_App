@@ -155,6 +155,40 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["event_participants"]["Insert"]>;
         Relationships: [];
       };
+      event_notifications: {
+        Row: {
+          id: string;
+          event_id: string;
+          user_id: string;
+          notification_type: "cancellation";
+          event_title: string;
+          event_start_at: string;
+          event_end_at: string;
+          organizer_id: string;
+          status: "pending" | "sent" | "failed";
+          attempts: number;
+          sent_at: string | null;
+          last_error: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          event_id: string;
+          user_id: string;
+          notification_type?: "cancellation";
+          event_title: string;
+          event_start_at: string;
+          event_end_at: string;
+          organizer_id: string;
+          status?: "pending" | "sent" | "failed";
+          attempts?: number;
+          sent_at?: string | null;
+          last_error?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["event_notifications"]["Insert"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
@@ -208,6 +242,10 @@ export interface Database {
       delete_cancelled_event: {
         Args: { p_event_id: string };
         Returns: void;
+      };
+      cancel_event: {
+        Args: { p_event_id: string; p_actor_id: string };
+        Returns: Database["public"]["Tables"]["events"]["Row"];
       };
     };
     Enums: Record<string, never>;

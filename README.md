@@ -9,7 +9,7 @@ Next.js 16（App Router）+ Supabase。イベント、空き時間登録、企�
 
 ## 2. DBスキーマを適用する
 
-`supabase/migrations/` の `0001` から `0009` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
+`supabase/migrations/` の `0001` から `0011` を番号順に適用します。既存プロジェクトでは適用済み番号を先に確認し、未適用分だけを実行してください。
 
 ```bash
 npx supabase login
@@ -17,7 +17,7 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push
 ```
 
-SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。`0007_super_user_delete_event.sql` は、キャンセル済みイベントをsuper userが完全削除するRPCを追加します。`0008_google_calendar_sync.sql` は、Google Calendar同期用のステータス列を追加します。`0009_active_members_and_admin_nicknames.sql` は、管理一覧のニックネーム取得と、有効な許可ユーザーだけを返すメンバー取得RPCを追加します。
+SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメールアドレスを自分のものへ変更して実行し、最初のsuper userをallowlistへ登録します。メンバーの追加・有効化・削除はログイン後の管理画面から行います。`0007_super_user_delete_event.sql` は緊急保守用の完全削除RPC、`0008_google_calendar_sync.sql` はGoogle Calendar同期用ステータス列、`0009_active_members_and_admin_nicknames.sql` は管理一覧・有効メンバー取得RPC、`0011_cancel_event_notifications.sql` はキャンセル通知outboxと原子的なキャンセルRPCを追加します。
 
 ## 3. ローカル開発・fixture
 
@@ -70,10 +70,14 @@ Workers & Pages → 対象Worker → Settings → Variables and Secretsで、**r
 | Variable | `CF_ACCESS_TEAM_DOMAIN` | `https://<team>.cloudflareaccess.com` |
 | Variable | `CF_ACCESS_AUD` | Access ApplicationのAUD |
 | Secret | `SUPABASE_SERVICE_ROLE_KEY` | Supabase service_role key |
+| Secret | `RESEND_API_KEY` | Resend API key |
+| Variable | `RESEND_FROM` | 検証済みドメインの送信者（例: `Calendar <calendar@example.com>`） |
 | Secret | `GOOGLE_SERVICE_ACCOUNT_JSON_BASE64` | サービスアカウントJSONのBase64 |
 | Variable | `GOOGLE_CALENDAR_ID` | 同期先のGoogleカレンダーID |
 
 `SUPABASE_SERVICE_ROLE_KEY`は`wrangler.jsonc`や`vars`、`NEXT_PUBLIC_*`、ログ、レスポンスへ書きません。CLIで設定する場合は、値を表示・コミットせずに実行します。
+
+イベントをキャンセルすると、APIが主催者本人の認証済みセッションを検証してからサーバー専用の `cancel_event` RPC を実行し、参加状態が `going` の参加者（主催者を除く）だけをキャンセル通知の送信対象にします。メール送信を有効にする場合は、サーバー専用の `RESEND_API_KEY` と `RESEND_FROM` を設定してください。未設定または送信失敗でもキャンセル自体は取り消されず、通知 outbox に失敗状態が記録されます。
 
 ```bash
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
@@ -129,7 +133,7 @@ npx wrangler rollback <previous-version-id>
 
 ## 6. イベント削除と既知の制約
 
-イベント作成者はイベントをキャンセルできます。キャンセルは履歴を残す論理削除です。`0007_super_user_delete_event.sql` 適用後は、super userだけが詳細画面の「完全に削除」からキャンセル済みイベントを物理削除できます。未キャンセルのイベントや一般ユーザーの削除はDB側で拒否されます。
+イベント作成者はイベントをキャンセルできます。キャンセルは履歴を残す論理削除です。キャンセル時点で `going` の参加者（主催者を除く）だけにメール通知します。通常画面からの完全削除導線はありません。既存の `delete_cancelled_event` RPC は、必要時にだけ super user がDBから実行する緊急保守用です。
 
 スマホの月表示では、同じ日に複数イベントがある場合、件数バッジは表示されますが、現状その月セルから個別のイベント詳細を開けません。週表示に切り替えると、各イベントをタップして詳細を確認できます。この月表示の詳細導線は次のUI修正対象です。
 

@@ -11,7 +11,7 @@
 | アプリ機能（Phase 1-6） | 実装済み | 画面①イベント、②空き時間、③企画、管理画面まで実装済み。実Supabase上の総合E2Eは未完了。 |
 | 空き時間の保存 | 実装済み・要DB適用確認 | UIは `set_availability_batch` を呼ぶ。実Supabaseに `0006_batch_availability.sql` が適用済みかを最優先で確認する。 |
 | 管理画面 | 実装済み・要DB適用確認 | UI/RPCは `0005_admin_access_controls.sql`、`0006`、`0009_active_members_and_admin_nicknames.sql` を前提にする。実環境では少なくとも `0001`〜`0004` 適用済み。後続migrationの適用状況は未記録なので、推測で扱わない。 |
-| イベント完全削除 | 実装済み・要DB適用確認 | `0007_super_user_delete_event.sql` 適用後、super userがキャンセル済みイベントを物理削除できる。未キャンセルイベントと一般ユーザーはDB側で拒否する。 |
+| イベントキャンセル通知 | 実装済み・要DB適用確認 | `0011_cancel_event_notifications.sql` は、主催者のキャンセルとgoing参加者への通知キュー作成を原子的に行う。通常UIの完全削除導線は撤去済みで、既存RPCは緊急保守用に限定する。 |
 | ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
 | Cloudflare Access 認証 | 実装済み・本番未検証 | JWT検証→Supabase allowlist→SSRセッション発行。13テストは成功済み。未許可メールには管理者登録依頼とGoogle再ログインの案内を返す。Cloudflare Dashboard/本番Secretは未設定。 |
 | Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solutions.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
@@ -21,7 +21,7 @@
 
 1. トークン交換エラー修正をデプロイし、イベント `8876b115-e0c6-4165-821c-3d62a0b803fb` の再同期で成功を確認する。
 2. Cloudflare DashboardでWorker runtime Variables/Secret、Custom Domain、Access Applicationを設定し、stagingまたは本番前のE2Eを行う。デプロイはユーザー承認後にのみ実施する。
-3. 実Supabaseの migration `0005` / `0006` / `0009` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
+3. 実Supabaseの migration `0005` / `0006` / `0009` / `0011` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
 4. 実機E2E（モバイル含む）を行う。ログイン、空き時間の下書き→確定→再読込→削除、他メンバー閲覧、企画、イベント参加、管理画面を確認する。
 
 ### Cloudflare Workersの互換性判断
@@ -98,6 +98,13 @@
 
 ## 直近の変更記録
 
+### イベントキャンセル通知（2026-08-09）
+
+- `cancel_event` RPCで主催者のみが公開イベントを論理キャンセルし、going参加者（主催者除外）を通知outboxへ原子的にスナップショットするようにした。
+- 直接のステータス変更とキャンセル済みイベントへの参加表明更新をDBトリガーで拒否し、画面の完全削除導線を撤去した。
+- `/api/events/cancel` は outbox の宛先をSupabase Auth Admin APIで解決し、Resend REST APIへ通知する。メール未設定・失敗はキャンセルを戻さず、件数のみ返す。
+- 未確認: migrationの実環境適用、Resend実配信、ブラウザE2E。
+
 ### 管理画面の自己許可メール保護・更新後再取得（2026-08-08）
 
 - **変更理由**: 管理者が自分自身の許可メールを変更・無効化・削除してアクセスを失う経路を、UIとDBの両方で防止する。また、管理操作成功後の一覧再取得失敗を操作失敗と誤表示しない。
@@ -173,7 +180,7 @@
 - **管理画面のニックネームと現行メンバー判定（2026-08-08）**: 管理者専用の許可メール一覧へニックネーム（未作成・空白は「未設定」）を追加した。`list_active_profiles()` は、profiles・auth.users・有効なallowed_emails・設定済みニックネームを照合し、空き時間と企画の現行メンバー候補を同じ判定へ統一する。許可の削除・無効化後は現行候補から除外し、再許可・有効化後は既存profileを再利用して戻す。profiles、auth.users、既存の空き時間、過去イベント・参加履歴は削除しない。管理RPC・migrationは実装済みだが、実Supabaseへの`0009`適用、本番デプロイ、実機UI確認は未実施。
 - **イベント月表示のモバイル対応**: 7列の月表示ではタイトルを無理に縮めず、確定イベントは色付きドット（4件以上は`+N`）で表示する。タップすると詳細ボトムシートでタイトル・日時・主催者・参加操作を確認できる。週表示では時刻＋タイトルの縦リストを使う。
 - **Cloudflare未許可メールの案内**: `/auth/cloudflare` は403を維持し、allowlist外のGoogleアカウントには管理者への登録依頼と再ログインを促す日本語メッセージを表示する。allowlist照合前の副作用はない。
-- **イベント完全削除**: `0007_super_user_delete_event.sql` とUIを追加。キャンセル済みイベントだけをsuper userが物理削除できる。未キャンセルイベントや一般ユーザーの削除は拒否する。
+- **イベント完全削除**: 通常UIからの導線は `0011_cancel_event_notifications.sql` で撤去済み。`delete_cancelled_event` は緊急保守時だけに使う super user 向けRPCとして残す。
 - **既知のモバイル問題**: 月表示で同日に複数イベントがある場合、件数バッジは表示されるが個別詳細を開けない。週表示では確認可能で、月表示の詳細導線を次の修正対象とする。
 
 ### ローカルSupabase fixture（コミット済み）
