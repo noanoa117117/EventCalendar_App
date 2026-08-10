@@ -5,11 +5,11 @@ import { formatTimeLabel } from "../src/lib/availability.ts";
 
 const source = readFileSync(new URL("../src/app/availability/_components/month-calendar.tsx", import.meta.url), "utf8");
 
-test("month availability labels use explicit start/end lines and a full-day label", () => {
-  assert.match(source, /const isAllDay = startTime === "00:00" && endTime === "24:00"/);
-  assert.match(source, /<span>〜\{endTime\}<\/span>/);
-  assert.match(source, /<span className="whitespace-nowrap">終日<\/span>/);
-  assert.doesNotMatch(source, /max-w-full truncate rounded border px-1 text-xs leading-4/);
+test("month availability uses member dots and overlap labels", () => {
+  assert.match(source, /全員OK/);
+  assert.match(source, /未登録/);
+  assert.match(source, /registeredIds/);
+  assert.doesNotMatch(source, /prioritizedSlots/);
 });
 
 test("month label times preserve full ranges and recognize the all-day boundary", () => {

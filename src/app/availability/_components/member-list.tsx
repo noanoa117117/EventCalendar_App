@@ -9,11 +9,13 @@ export function MemberList({
   currentUserId,
   visibleIds,
   onToggle,
+  registrationStatus,
 }: {
   members: Profile[];
   currentUserId: string;
   visibleIds: Set<string>;
   onToggle: (id: string) => void;
+  registrationStatus?: Map<string, { registered: number; total: number }>;
 }) {
   return (
     <div className="flex h-full flex-col gap-4">
@@ -41,6 +43,12 @@ export function MemberList({
                   <span className="text-muted-foreground"> (自分)</span>
                 )}
               </span>
+              {registrationStatus?.get(m.id)?.registered === 0 && (
+                <span className="ml-auto shrink-0 rounded bg-warning-soft px-1.5 py-0.5 text-[10px] text-warning-foreground">未登録</span>
+              )}
+              {(registrationStatus?.get(m.id)?.registered ?? 0) > 0 && (registrationStatus?.get(m.id)?.registered ?? 0) < (registrationStatus?.get(m.id)?.total ?? 0) * 0.3 && (
+                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{registrationStatus?.get(m.id)?.registered}日</span>
+              )}
             </label>
           </li>
         ))}

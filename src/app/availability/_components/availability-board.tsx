@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { addMonths, eachDayOfInterval, endOfMonth, format, startOfMonth } from "date-fns";
+import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
@@ -30,6 +30,7 @@ import type { Preset, Profile, Slot } from "@/lib/types";
 import { MemberList } from "./member-list";
 import { PresetPanel } from "./preset-panel";
 import { MonthCalendar } from "./month-calendar";
+import { WeekCalendar } from "./week-calendar";
 
 export function AvailabilityBoard({
   currentUser,
@@ -60,6 +61,7 @@ export function AvailabilityBoard({
   const [confirming, setConfirming] = useState(false);
   const [deleteMonthDialogOpen, setDeleteMonthDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const fetchGeneration = useRef(0);
 
   const selfVisible = visibleIds.has(currentUser.id);
@@ -79,7 +81,7 @@ export function AvailabilityBoard({
   const canActivatePreset = editing && selfVisible;
   const activePreset = canActivatePreset ? presets.find((p) => p.id === activePresetId) ?? null : null;
 
-  const range = useMemo(() => monthGridRange(cursorDate), [cursorDate]);
+  const range = useMemo(() => viewMode === "month" ? monthGridRange(cursorDate) : { start: startOfWeek(cursorDate, { weekStartsOn: 0 }), end: endOfWeek(cursorDate, { weekStartsOn: 0 }) }, [cursorDate, viewMode]);
 
   const fetchSlots = useCallback(async () => {
     if (preview) return;
@@ -166,16 +168,22 @@ export function AvailabilityBoard({
   }, [hasDraft]);
 
   function goPrev() {
-    setCursorDate((d) => addMonths(d, -1));
+    setCursorDate((d) => viewMode === "month" ? addMonths(d, -1) : addWeeks(d, -1));
   }
   function goNext() {
-    setCursorDate((d) => addMonths(d, 1));
+    setCursorDate((d) => viewMode === "month" ? addMonths(d, 1) : addWeeks(d, 1));
   }
   function goToday() {
     setCursorDate(jstNow());
   }
 
-  const title = format(cursorDate, "yyyy年M月", { locale: ja });
+  const title = viewMode === "month" ? format(cursorDate, "yyyy年M月", { locale: ja }) : `${format(range.start, "M月d日", { locale: ja })}〜${format(range.end, "M月d日", { locale: ja })}`;
+  const registrationStatus = useMemo(() => {
+    const dates = eachDayOfInterval(range)
+      .filter((date) => viewMode === "week" || isSameMonth(date, cursorDate))
+      .map((date) => format(date, "yyyy-MM-dd"));
+    return new Map(members.filter((member) => visibleIds.has(member.id)).map((member) => [member.id, { registered: dates.filter((date) => projectedSlots.some((slot) => slot.user_id === member.id && slot.date === date)).length, total: dates.length }]));
+  }, [members, projectedSlots, range, viewMode, cursorDate, visibleIds]);
 
   const [mobilePanel, setMobilePanel] = useState<"calendar" | "members">("calendar");
   return (
@@ -199,6 +207,7 @@ export function AvailabilityBoard({
           currentUserId={currentUser.id}
           visibleIds={visibleIds}
           onToggle={toggleMember}
+          registrationStatus={registrationStatus}
         />
       </aside>
 
@@ -218,6 +227,8 @@ export function AvailabilityBoard({
             </Button>
             </div>
             <div className="hidden min-w-0 basis-full @lg:block @lg:flex-1"><h1 className="text-sm font-semibold">空き時間を登録・確認</h1><p className="text-xs text-muted-foreground">あなたの空き時間を登録し、選択したメンバーの空き時間を確認できます。</p><p className="text-xs text-muted-foreground">{title}</p></div>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as typeof viewMode)}><TabsList><TabsTrigger value="month">月</TabsTrigger><TabsTrigger value="week">週</TabsTrigger></TabsList></Tabs>
+            {viewMode === "week" && <Button size="sm" variant="outline" onClick={() => setViewMode("month")}>月に戻る</Button>}
             <div className={`flex min-w-0 items-center gap-1 ${editing ? "w-full flex-wrap @lg:w-auto" : "ml-auto shrink-0"}`}>
               {loading && <span className="text-xs text-muted-foreground">更新中...</span>}
               {!editing && <Button className="shrink-0" size="sm" variant="outline" disabled={!selfVisible} onClick={() => setEditing(true)}>編集する</Button>}
@@ -258,18 +269,19 @@ export function AvailabilityBoard({
         )}
 
         <div className="relative min-h-0 flex-1 overflow-hidden">
-          <MonthCalendar
+          {viewMode === "month" ? <MonthCalendar
             cursorDate={cursorDate}
             members={members}
             visibleIds={visibleIds}
             currentUserId={currentUser.id}
             slots={projectedSlots}
             activePreset={activePreset}
-            presets={presets}
             canEdit={editing && selfVisible}
             window={editableWindow}
             onPaint={handlePaint}
+            onSelectDate={(date) => { const [y, m, d] = date.split("-").map(Number); setCursorDate(new Date(y, m - 1, d)); setViewMode("week"); }}
           />
+          : <WeekCalendar cursorDate={cursorDate} members={members} visibleIds={visibleIds} currentUserId={currentUser.id} slots={projectedSlots} activePreset={activePreset} canEdit={editing && selfVisible} window={editableWindow} onPaint={handlePaint} />}
           {loading && (
             <div
               className="absolute inset-0 z-10 flex items-center justify-center bg-background/70 backdrop-blur-[1px]"

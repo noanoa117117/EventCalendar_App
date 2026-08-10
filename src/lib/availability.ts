@@ -174,3 +174,69 @@ export function expandToSlots(ranges: TimeRange[]): string[] {
   }
   return Array.from(cells).sort();
 }
+
+/** A compact, 30-minute-cell summary used by both calendar views. */
+export interface DaySummary {
+  date: string;
+  registeredIds: string[];
+  unregisteredIds: string[];
+  commonRanges: TimeRange[];
+  fullMatch: boolean;
+  softMatch: boolean;
+}
+
+function cellsToRanges(cells: string[]): TimeRange[] {
+  const minutes = cells.map(startMinutes).sort((a, b) => a - b);
+  const ranges: TimeRange[] = [];
+  if (!minutes.length) return ranges;
+  let start = minutes[0];
+  let previous = start;
+  for (const minute of minutes.slice(1)) {
+    if (minute !== previous + 30) {
+      ranges.push({ start_time: minutesToTime(start), end_time: minutesToTime(previous + 30) });
+      start = minute;
+    }
+    previous = minute;
+  }
+  ranges.push({ start_time: minutesToTime(start), end_time: minutesToTime(previous + 30) });
+  return ranges;
+}
+
+/** Compute full (all members) and soft (some members) availability per day. */
+export function computeDaySummaries(
+  dates: Iterable<string>,
+  members: Array<{ id: string }>,
+  visibleIds: Iterable<string>,
+  slots: Array<TimeRange & { date: string; user_id: string }>,
+): Map<string, DaySummary> {
+  const visibleSet = new Set(visibleIds);
+  // Preserve the display order from members while ignoring stale IDs.
+  const ids = members.filter((member) => visibleSet.has(member.id)).map((member) => member.id);
+  const memberSet = new Set(ids);
+  const registeredByDate = new Map<string, Map<string, TimeRange[]>>();
+  for (const slot of slots) {
+    if (!memberSet.has(slot.user_id)) continue;
+    const byUser = registeredByDate.get(slot.date) ?? new Map<string, TimeRange[]>();
+    const ranges = byUser.get(slot.user_id) ?? [];
+    ranges.push(slot);
+    byUser.set(slot.user_id, ranges);
+    registeredByDate.set(slot.date, byUser);
+  }
+  const result = new Map<string, DaySummary>();
+  for (const date of dates) {
+    const byUser = registeredByDate.get(date) ?? new Map<string, TimeRange[]>();
+    const registeredIds = ids.filter((id) => byUser.has(id));
+    const unregisteredIds = ids.filter((id) => !byUser.has(id));
+    let commonCells: Set<string> | null = null;
+    for (const id of registeredIds) {
+      const cells = new Set(expandToSlots(byUser.get(id) ?? []));
+      if (!commonCells) commonCells = cells;
+      else commonCells = new Set(Array.from<string>(commonCells).filter((cell) => cells.has(cell)));
+    }
+    const commonRanges = cellsToRanges(Array.from(commonCells ?? []).sort());
+    result.set(date, { date, registeredIds, unregisteredIds, commonRanges,
+      fullMatch: ids.length > 0 && registeredIds.length === ids.length && commonRanges.length > 0,
+      softMatch: unregisteredIds.length > 0 && registeredIds.length >= 2 && commonRanges.length > 0 });
+  }
+  return result;
+}

@@ -79,6 +79,8 @@ Workers & Pages → 対象Worker → Settings → Variables and Secretsで、**r
 
 イベントをキャンセルすると、APIが主催者本人の認証済みセッションを検証してからサーバー専用の `cancel_event` RPC を実行し、参加状態が `going` の参加者（主催者を除く）だけをキャンセル通知の送信対象にします。メール送信を有効にする場合は、サーバー専用の `RESEND_API_KEY` と `RESEND_FROM` を設定してください。未設定または送信失敗でもキャンセル自体は取り消されず、通知 outbox に失敗状態が記録されます。
 
+このキャンセル通知フローは、`0011` 適用後にproduction（prd）でユーザー検証済みです。検証範囲の記録は [PROGRESS.md](./PROGRESS.md) を参照してください。
+
 ```bash
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY
 ```

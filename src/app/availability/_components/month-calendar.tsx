@@ -4,7 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { addDays, format, isSameMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import { cn } from "@/lib/utils";
-import { formatTimeLabel, isDateEditable, isRangeCovered, monthGridRange } from "@/lib/availability";
+import { computeDaySummaries, formatTimeLabel, isDateEditable, isRangeCovered, monthGridRange, startMinutes, endMinutes } from "@/lib/availability";
+import type { TimeRange } from "@/lib/availability";
 import type { Preset, Profile, Slot } from "@/lib/types";
 
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
@@ -16,10 +17,10 @@ export function MonthCalendar({
   currentUserId,
   slots,
   activePreset,
-  presets,
   window: editableWindow,
   onPaint,
   canEdit,
+  onSelectDate,
 }: {
   cursorDate: Date;
   members: Profile[];
@@ -27,15 +28,18 @@ export function MonthCalendar({
   currentUserId: string;
   slots: Slot[];
   activePreset: Preset | null;
-  presets: Preset[];
   window: { min: string; max: string };
   onPaint: (dates: string[], action: "apply" | "remove", preset: Preset) => void;
   canEdit: boolean;
+  onSelectDate?: (date: string) => void;
 }) {
   const { start: gridStart, end: gridEnd } = monthGridRange(cursorDate);
 
-  const days: Date[] = [];
-  for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) days.push(d);
+  const days = useMemo(() => {
+    const result: Date[] = [];
+    for (let d = gridStart; d <= gridEnd; d = addDays(d, 1)) result.push(d);
+    return result;
+  }, [gridStart, gridEnd]);
 
   const slotsByUserDate = useMemo(() => {
     const map = new Map<string, Slot[]>();
@@ -47,6 +51,19 @@ export function MonthCalendar({
     }
     return map;
   }, [slots]);
+  const visibleMembers = members.filter((m) => visibleIds.has(m.id));
+  const summaries = useMemo(() => computeDaySummaries(days.map((d) => format(d, "yyyy-MM-dd")), visibleMembers, visibleMembers.map((m) => m.id), slots), [slots, visibleMembers, days]);
+  const nickname = (id: string) => members.find((member) => member.id === id)?.nickname ?? "不明";
+  const formatCommonRange = (ranges: TimeRange[]) =>
+    ranges.map((range) => `${formatTimeLabel(range.start_time)}〜${formatTimeLabel(range.end_time, true)}`).join("、");
+  const bestDay = useMemo(() => {
+    const candidates = Array.from(summaries.values()).filter((summary) => summary.fullMatch || summary.softMatch);
+    return candidates.reduce<typeof candidates[number] | null>((best, summary) => {
+      const longest = Math.max(...summary.commonRanges.map((range) => endMinutes(range.end_time) - startMinutes(range.start_time)));
+      const bestLongest = best ? Math.max(...best.commonRanges.map((range) => endMinutes(range.end_time) - startMinutes(range.start_time))) : -1;
+      return longest > bestLongest ? summary : best;
+    }, null);
+  }, [summaries]);
 
   const [dragging, setDragging] = useState(false);
   const [visited, setVisited] = useState<Set<string>>(new Set());
@@ -135,6 +152,16 @@ export function MonthCalendar({
 
   return (
     <div className="flex h-full flex-col">
+      {bestDay && (
+        <div className="flex items-center gap-2 border-b bg-overlap-soft/30 px-3 py-2 text-sm">
+          <span className="min-w-0 flex-1 font-medium text-overlap-foreground">
+            {bestDay.fullMatch
+              ? `${format(new Date(`${bestDay.date}T00:00:00`), "M/d (E)", { locale: ja })} 全員OK ${formatCommonRange(bestDay.commonRanges)}`
+              : `${format(new Date(`${bestDay.date}T00:00:00`), "M/d (E)", { locale: ja })} ${bestDay.registeredIds.length}人OK ${formatCommonRange(bestDay.commonRanges)}（${bestDay.unregisteredIds.map(nickname).join("・")}未登録）`}
+          </span>
+          <button type="button" className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-background" onClick={() => onSelectDate?.(bestDay.date)}>詳細を見る</button>
+        </div>
+      )}
       <div className="grid grid-cols-7 border-b text-center text-xs font-medium text-muted-foreground">
         {WEEKDAY_LABELS.map((w) => (
           <div key={w} className="py-2">
@@ -149,19 +176,8 @@ export function MonthCalendar({
           const editable = isEditable(dateStr);
           const applied = isAppliedByActivePreset(dateStr);
           const isVisitedNow = visited.has(dateStr);
-          const dotMembers = members.filter(
-            (m) =>
-              visibleIds.has(m.id) &&
-              (slotsByUserDate.get(`${m.id}|${dateStr}`) ?? []).length > 0,
-          );
-          const visibleSlots = dotMembers.flatMap((m) =>
-            (slotsByUserDate.get(`${m.id}|${dateStr}`) ?? []).map((slot) => ({ member: m, slot })),
-          );
-          const prioritizedSlots = [
-            ...visibleSlots.filter(({ member }) => member.id === currentUserId),
-            ...visibleSlots.filter(({ member }) => member.id !== currentUserId),
-          ];
-          const chips = prioritizedSlots.slice(0, 2);
+          const summary = summaries.get(dateStr);
+          const selfSlots = slotsByUserDate.get(`${currentUserId}|${dateStr}`) ?? [];
 
           return (
             <div
@@ -169,6 +185,7 @@ export function MonthCalendar({
               data-date={dateStr}
               onPointerDown={(e) => handlePointerDown(dateStr, e)}
               onPointerEnter={() => handlePointerEnter(dateStr)}
+              onClick={() => { if ((!canEdit || !activePreset) && onSelectDate) onSelectDate(dateStr); }}
               className={cn(
                 "flex select-none flex-col gap-1 p-1.5 text-left align-top",
                 !inMonth && "bg-muted/30",
@@ -187,42 +204,22 @@ export function MonthCalendar({
               >
                 {format(day, "d", { locale: ja })}
               </span>
+              {summary?.fullMatch && (
+                <div className="overlap-block rounded px-1 py-0.5 text-[11px] leading-tight">
+                  全員OK {formatCommonRange(summary.commonRanges)}
+                </div>
+              )}
+              {summary?.softMatch && !summary.fullMatch && (
+                <div className="rounded bg-overlap-soft/40 px-1 py-0.5 text-[11px] leading-tight text-overlap-foreground">
+                  {summary.registeredIds.length}人OK <span className="text-warning-foreground">({summary.unregisteredIds.map(nickname).join("・")}未登録)</span>
+                </div>
+              )}
               <div className="flex flex-wrap gap-0.5">
-                {chips.map(({ member: m, slot }) => {
-                  const ownPreset = m.id === currentUserId ? presets.find((p) => p.id === slot.preset_id) : undefined;
-                  const isDraft = slot.id.startsWith("draft-");
-                  const startTime = formatTimeLabel(slot.start_time);
-                  const endTime = formatTimeLabel(slot.end_time, true);
-                  const isAllDay = startTime === "00:00" && endTime === "24:00";
-                  const timeLabel = isAllDay ? "終日" : `${startTime}〜${endTime}`;
-                  const visibleLabel = m.id === currentUserId
-                    ? `${isDraft ? "未確定 " : ""}${timeLabel}`
-                    : `${m.nickname} ${timeLabel}`;
-                  const titleLabel = m.id === currentUserId
-                    ? `${isDraft ? "未確定 " : ""}${ownPreset?.label ?? "空き"} ${timeLabel}`
-                    : visibleLabel;
-                  return (
-                    <span
-                      key={`${m.id}-${slot.id}`}
-                      className={cn("flex min-w-0 max-w-full flex-col items-center rounded border px-1 py-0.5 text-center text-[10px] leading-[1.1]", isDraft && "border-dashed opacity-75")}
-                      style={{ borderColor: ownPreset?.color ?? (m.id === currentUserId ? "var(--muted-foreground)" : m.color) }}
-                      title={titleLabel}
-                    >
-                      {m.id !== currentUserId && <span className="w-full truncate">{m.nickname}</span>}
-                      {isDraft && <span>未確定</span>}
-                      {isAllDay ? (
-                        <span className="whitespace-nowrap">終日</span>
-                      ) : (
-                        <span className="flex flex-col items-center whitespace-nowrap leading-none">
-                          <span>{startTime}</span>
-                          <span>〜{endTime}</span>
-                        </span>
-                      )}
-                    </span>
-                  );
-                })}
-                {prioritizedSlots.length > chips.length && <span className="text-xs text-muted-foreground">+{prioritizedSlots.length - chips.length}</span>}
+                {visibleMembers.map((m) => (
+                  <span key={m.id} className={cn("size-1.5 rounded-full", !summary?.registeredIds.includes(m.id) && "bg-muted-foreground/20")} style={summary?.registeredIds.includes(m.id) ? { backgroundColor: m.color } : undefined} title={`${m.nickname}: ${summary?.registeredIds.includes(m.id) ? "登録済み" : "未登録"}`} aria-label={`${m.nickname}: ${summary?.registeredIds.includes(m.id) ? "登録済み" : "未登録"}`} />
+                ))}
               </div>
+              {selfSlots.length > 0 && <span className="text-[10px] text-free-foreground">{formatTimeLabel(selfSlots[0].start_time)}〜</span>}
             </div>
           );
         })}

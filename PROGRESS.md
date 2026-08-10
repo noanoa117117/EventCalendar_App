@@ -4,14 +4,14 @@
 
 ## 現在地（最初に読む）
 
-**最終更新: 2026-08-08 / Google Calendar同期MVP、管理画面のニックネーム表示・有効メンバー判定を実装済み（実Supabase migration適用・デプロイ待ち）。空き時間UIはデザイントークン統一・プリセット管理統合・週表示廃止（月表示のみに変更）を実施**
+**最終更新: 2026-08-09 / イベントキャンセル通知はproduction（prd）でユーザー検証済み。Google Calendar同期MVP、管理画面のニックネーム表示・有効メンバー判定を実装済み。空き時間UIはデザイントークン統一・プリセット管理統合・週表示廃止（月表示のみに変更）を実施**
 
 | 項目 | 状態 | 事実・次の判断 |
 | --- | --- | --- |
 | アプリ機能（Phase 1-6） | 実装済み | 画面①イベント、②空き時間、③企画、管理画面まで実装済み。実Supabase上の総合E2Eは未完了。 |
 | 空き時間の保存 | 実装済み・要DB適用確認 | UIは `set_availability_batch` を呼ぶ。実Supabaseに `0006_batch_availability.sql` が適用済みかを最優先で確認する。 |
 | 管理画面 | 実装済み・要DB適用確認 | UI/RPCは `0005_admin_access_controls.sql`、`0006`、`0009_active_members_and_admin_nicknames.sql` を前提にする。実環境では少なくとも `0001`〜`0004` 適用済み。後続migrationの適用状況は未記録なので、推測で扱わない。 |
-| イベントキャンセル通知 | 実装済み・要DB適用確認 | `0011_cancel_event_notifications.sql` は、主催者のキャンセルとgoing参加者への通知キュー作成を原子的に行う。通常UIの完全削除導線は撤去済みで、既存RPCは緊急保守用に限定する。 |
+| イベントキャンセル通知 | 実装済み・production検証済み | ユーザー報告により `0011_cancel_event_notifications.sql` 適用後のproduction（prd）動作を確認済み。主催者のキャンセルとgoing参加者への通知キュー作成を原子的に行い、通常UIの完全削除導線は撤去済み。既存RPCは緊急保守用に限定する。 |
 | ローカル検証 | 構築済み | Docker Supabase + 実在しない fixture 3ユーザー（メール/パスワード）を任意投入できる。通常開発は `npm run dev:local`。fixtureは自動投入しない。 |
 | Cloudflare Access 認証 | 実装済み・本番未検証 | JWT検証→Supabase allowlist→SSRセッション発行。13テストは成功済み。未許可メールには管理者登録依頼とGoogle再ログインの案内を返す。Cloudflare Dashboard/本番Secretは未設定。 |
 | Workers移行 | 実装済み・未デプロイ | OpenNext `1.20.2` + Wrangler `4.119.0`、Edge互換legacy `src/middleware.ts`、Custom Domain `invitation-event-calendar.amida-solutions.uk`を設定済み。ローカルworkerdで無JWT・不正Hostの403を確認。本番/stagingには未デプロイ。 |
@@ -21,7 +21,7 @@
 
 1. トークン交換エラー修正をデプロイし、イベント `8876b115-e0c6-4165-821c-3d62a0b803fb` の再同期で成功を確認する。
 2. Cloudflare DashboardでWorker runtime Variables/Secret、Custom Domain、Access Applicationを設定し、stagingまたは本番前のE2Eを行う。デプロイはユーザー承認後にのみ実施する。
-3. 実Supabaseの migration `0005` / `0006` / `0009` / `0011` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
+3. 実Supabaseの migration `0005` / `0006` / `0009` の適用状況をSQLで確認し、未適用ならユーザーが適用する。
 4. 実機E2E（モバイル含む）を行う。ログイン、空き時間の下書き→確定→再読込→削除、他メンバー閲覧、企画、イベント参加、管理画面を確認する。
 
 ### Cloudflare Workersの互換性判断
@@ -83,6 +83,7 @@
 
 - [x] 実Supabaseプロジェクトを作成し `0001`〜`0004` を番号順に適用
 - [ ] `0005_admin_access_controls.sql` / `0006_batch_availability.sql` / `0009_active_members_and_admin_nicknames.sql` の実Supabase適用状況を確認し、未適用なら順に適用（適用前に内容を確認する）
+- [x] `0011_cancel_event_notifications.sql` を実Supabaseへ適用し、production（prd）でイベントキャンセル通知を確認
 - [x] `supabase/seed.sql` のメールアドレスを自分のものに書き換えて実行（ホワイトリスト登録）
 - [x] Workers移行完了後、Cloudflare Zero TrustでAccess Applicationを作成し、`CF_ACCESS_TEAM_DOMAIN` / `CF_ACCESS_AUD` とサーバー専用の `SUPABASE_SERVICE_ROLE_KEY` をWorkersの環境変数／Secretとして設定
 - [x] `.env.local` に `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY` を設定
@@ -103,7 +104,7 @@
 - `cancel_event` RPCで主催者のみが公開イベントを論理キャンセルし、going参加者（主催者除外）を通知outboxへ原子的にスナップショットするようにした。
 - 直接のステータス変更とキャンセル済みイベントへの参加表明更新をDBトリガーで拒否し、画面の完全削除導線を撤去した。
 - `/api/events/cancel` は outbox の宛先をSupabase Auth Admin APIで解決し、Resend REST APIへ通知する。メール未設定・失敗はキャンセルを戻さず、件数のみ返す。
-- 未確認: migrationの実環境適用、Resend実配信、ブラウザE2E。
+- **production検証済み（ユーザー報告）**: migration適用後のイベントキャンセル通知。検証の詳細手順・対象件数は未記録。
 
 ### 管理画面の自己許可メール保護・更新後再取得（2026-08-08）
 
