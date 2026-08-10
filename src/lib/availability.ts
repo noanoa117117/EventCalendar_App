@@ -235,7 +235,7 @@ export function computeDaySummaries(
     }
     const commonRanges = cellsToRanges(Array.from(commonCells ?? []).sort());
     result.set(date, { date, registeredIds, unregisteredIds, commonRanges,
-      fullMatch: ids.length > 0 && registeredIds.length === ids.length && commonRanges.length > 0,
+      fullMatch: ids.length >= 2 && registeredIds.length === ids.length && commonRanges.length > 0,
       softMatch: unregisteredIds.length > 0 && registeredIds.length >= 2 && commonRanges.length > 0 });
   }
   return result;

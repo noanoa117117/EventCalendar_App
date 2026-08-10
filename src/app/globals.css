@@ -121,6 +121,9 @@
   --overlap-soft: oklch(0.955 0.055 82);
   --overlap-strong: oklch(0.665 0.145 62);
   --overlap-foreground: oklch(0.40 0.10 62);
+  --soft-overlap: oklch(0.94 0.045 255);
+  --soft-overlap-border: oklch(0.63 0.125 255);
+  --soft-overlap-foreground: oklch(0.37 0.09 255);
 
   --warning: oklch(0.70 0.13 62);
   --warning-soft: oklch(0.965 0.040 70);
@@ -184,6 +187,9 @@
   --overlap-soft: oklch(0.38 0.075 68);
   --overlap-strong: oklch(0.855 0.150 85);
   --overlap-foreground: oklch(0.94 0.04 82);
+  --soft-overlap: oklch(0.31 0.055 255);
+  --soft-overlap-border: oklch(0.73 0.125 255);
+  --soft-overlap-foreground: oklch(0.93 0.035 255);
 
   --warning: oklch(0.80 0.135 72);
   --warning-soft: oklch(0.36 0.070 65);
@@ -489,12 +495,22 @@
 @utility overlap-block {
   background: linear-gradient(
     180deg,
-    color-mix(in oklab, var(--overlap) 30%, var(--card)),
-    color-mix(in oklab, var(--overlap) 18%, var(--card))
+    color-mix(in oklab, var(--overlap) 46%, var(--card)),
+    color-mix(in oklab, var(--overlap) 28%, var(--card))
   );
-  border: 1px solid color-mix(in oklab, var(--overlap-strong) 45%, transparent);
+  border: 1px solid color-mix(in oklab, var(--overlap-strong) 65%, transparent);
   color: var(--overlap-foreground);
   box-shadow: 0 1px 0 color-mix(in oklab, var(--overlap-strong) 25%, transparent);
+}
+
+@utility overlap-soft-block {
+  background: var(--soft-overlap);
+  border: 1px solid color-mix(in oklab, var(--soft-overlap-border) 65%, transparent);
+  color: var(--soft-overlap-foreground);
+}
+
+@utility availability-unregistered {
+  background-image: repeating-linear-gradient(-45deg, color-mix(in oklab, var(--muted-foreground) 7%, transparent) 0 2px, transparent 2px 6px);
 }
 
 /* カレンダーの罫線グリッド。border-b border-r の付け忘れ由来のガタつきを消す */

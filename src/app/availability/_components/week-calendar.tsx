@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { addDays, format, startOfWeek } from "date-fns";
+import { useRouter } from "next/navigation";
+import { addDays, format } from "date-fns";
 import { ja } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import {
@@ -40,7 +41,9 @@ export function WeekCalendar({
   window: { min: string; max: string };
   onPaint: (dates: string[], action: "apply" | "remove", preset: Preset) => void;
 }) {
-  const days = useMemo(() => Array.from({ length: 7 }, (_, index) => addDays(startOfWeek(cursorDate, { weekStartsOn: 0 }), index)), [cursorDate]);
+  const router = useRouter();
+  // Keep the date selected from the month view in the middle, with context on either side.
+  const days = useMemo(() => [-1, 0, 1].map((offset) => addDays(cursorDate, offset)), [cursorDate]);
   const visibleMembers = useMemo(() => members.filter((member) => visibleIds.has(member.id)), [members, visibleIds]);
   const dates = useMemo(() => days.map((day) => format(day, "yyyy-MM-dd")), [days]);
   const slotsByUserDate = useMemo(() => {
@@ -136,14 +139,16 @@ export function WeekCalendar({
 
   return (
     <div className="h-full overflow-auto">
-      <div className="grid min-w-[44rem] grid-cols-[4rem_repeat(7,minmax(6rem,1fr))] border-b text-center text-xs font-medium">
+      <div className="grid min-w-[24rem] grid-cols-[4rem_repeat(3,minmax(0,1fr))] border-b text-center text-xs font-medium">
         <div />
         {days.map((day) => {
           const summary = summaries.get(format(day, "yyyy-MM-dd"));
-          return <div key={format(day, "yyyy-MM-dd")} className="border-l py-2">{format(day, "M/d (E)", { locale: ja })}<div className="text-[10px] text-muted-foreground">{summary?.registeredIds.length ?? 0}人登録済み / {visibleMembers.length}人中</div></div>;
+          const registered = summary?.registeredIds.length ?? 0;
+          const total = visibleMembers.length;
+          return <div key={format(day, "yyyy-MM-dd")} className="border-l px-1 py-2">{format(day, "M/d (E)", { locale: ja })}<div className="text-[10px] text-muted-foreground">表示中 {registered}人登録済み / {total}人中</div><div role="progressbar" aria-label={`${format(day, "M月d日", { locale: ja })} 登録状況`} aria-valuemin={0} aria-valuemax={total} aria-valuenow={registered} className="mt-1 h-1 overflow-hidden rounded-full bg-muted"><span className="block h-full bg-primary" style={{ width: total ? `${registered / total * 100}%` : "0%" }} /></div></div>;
         })}
       </div>
-      <div className="grid min-w-[44rem] grid-cols-[4rem_repeat(7,minmax(6rem,1fr))]">
+      <div className="grid min-w-[24rem] grid-cols-[4rem_repeat(3,minmax(0,1fr))]">
         {rows.map((minute) => (
           <div key={minute} className="contents">
             <div className="h-7 border-b pr-1 text-right text-[10px] leading-7 text-muted-foreground">{displayTime(minute)}</div>
@@ -155,17 +160,44 @@ export function WeekCalendar({
               const summary = summaries.get(date);
               const isFullOverlap = Boolean(summary?.fullMatch && minute < 1440 && isRangeCovered(summary.commonRanges, cellStart, cellEnd));
               const isSoftOverlap = Boolean(summary?.softMatch && minute < 1440 && isRangeCovered(summary.commonRanges, cellStart, cellEnd));
+              const canOpenPlanning = isFullOverlap && !activePreset;
+              const hasOtherMemberAvailability = Boolean(summary?.registeredIds.some((id) => id !== currentUserId));
               const unregisteredNames = summary?.unregisteredIds.map((id) => members.find((member) => member.id === id)?.nickname ?? "不明").join("・") ?? "";
               return (
                 <div
                   key={`${date}-${minute}`}
                   data-week-date={date}
                   onPointerDown={(event) => startPaint(date, event)}
-                  className={cn("relative h-7 border-b border-l px-0.5", isFullOverlap && "overlap-block", isSoftOverlap && !isFullOverlap && "bg-overlap-soft/40", canEdit && activePreset && isDateEditable(date, editableWindow) && "cursor-pointer", dragging && "touch-none", visited.has(date) && "ring-1 ring-inset ring-primary/50")}
+                  role={canOpenPlanning ? "button" : undefined}
+                  tabIndex={canOpenPlanning ? 0 : undefined}
+                  aria-label={canOpenPlanning ? `${date} ${displayTime(minute)} 全員の共通空き時間から企画` : undefined}
+                  onClick={() => {
+                    if (!canOpenPlanning || draggingRef.current) return;
+                    const params = new URLSearchParams({ date, start: cellStart, members: visibleMembers.map((member) => member.id).join(",") });
+                    router.push(`/planning?${params.toString()}`);
+                  }}
+                  onKeyDown={(event) => {
+                    if (canOpenPlanning && (event.key === "Enter" || event.key === " ")) {
+                      event.preventDefault();
+                      const params = new URLSearchParams({ date, start: cellStart, members: visibleMembers.map((member) => member.id).join(",") });
+                      router.push(`/planning?${params.toString()}`);
+                    }
+                  }}
+                  className={cn("relative h-7 border-b border-l px-0.5", isFullOverlap && "overlap-block", isSoftOverlap && !isFullOverlap && "overlap-soft-block", canEdit && activePreset && isDateEditable(date, editableWindow) && "cursor-pointer", dragging && "touch-none", visited.has(date) && "ring-1 ring-inset ring-primary/50")}
                   style={{ touchAction: canEdit && activePreset && isDateEditable(date, editableWindow) ? "none" : "auto" }}
                   title={`${date} ${displayTime(minute)}${isSoftOverlap ? `（${unregisteredNames}未登録）` : ""}`}
                 >
-                  {freeMembers.length > 0 && <div className="flex h-3 items-center gap-0.5 pt-0.5">{freeMembers.slice(0, 3).map((member) => <span key={member.id} className="h-2 flex-1 rounded-sm" style={{ backgroundColor: member.color }} title={`${member.nickname}: 空き`} />)}{freeMembers.length > 3 && <span className="text-[9px] leading-none">+{freeMembers.length - 3}</span>}</div>}
+                  <div className="grid h-full items-stretch gap-px py-0.5" style={{ gridTemplateColumns: `repeat(${Math.max(visibleMembers.length, 1)}, minmax(0, 1fr))` }}>
+                    {visibleMembers.map((member) => {
+                      const isFree = freeMembers.some((freeMember) => freeMember.id === member.id);
+                      const isUnregistered = hasOtherMemberAvailability && summary?.unregisteredIds.includes(member.id);
+                      return isFree
+                        ? <span key={member.id} className="min-w-0 rounded-sm" style={{ backgroundColor: member.color }} title={`${member.nickname}: 空き`} />
+                        : isUnregistered
+                          ? <span key={member.id} className="min-w-0 rounded-sm border-2 border-dotted bg-transparent" style={{ borderColor: member.color }} title={`${member.nickname}: 未登録`} />
+                          : <span key={member.id} aria-hidden="true" />;
+                    })}
+                  </div>
                   {isSoftOverlap && <span className="absolute inset-x-0 bottom-0 truncate px-0.5 text-[8px] leading-3 text-overlap-foreground">{unregisteredNames}未登録</span>}
                 </div>
               );

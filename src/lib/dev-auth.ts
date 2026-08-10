@@ -13,12 +13,24 @@ const previewUserId = "00000000-0000-4000-8000-000000000001";
 const previewEventId = "00000000-0000-4000-8000-000000000010";
 const previewOtherUserId = "00000000-0000-4000-8000-000000000002";
 const previewThirdUserId = "00000000-0000-4000-8000-000000000003";
+const previewFourthUserId = "00000000-0000-4000-8000-000000000004";
+const previewFifthUserId = "00000000-0000-4000-8000-000000000005";
+const previewSixthUserId = "00000000-0000-4000-8000-000000000006";
+const previewSeventhUserId = "00000000-0000-4000-8000-000000000007";
+const previewEighthUserId = "00000000-0000-4000-8000-000000000008";
+const previewNinthUserId = "00000000-0000-4000-8000-000000000009";
 
 const previewCurrentUser: Profile = { id: previewUserId, nickname: "ローカルユーザー", color: "#2563eb" };
 const previewPeople: Profile[] = [
   previewCurrentUser,
-  { id: previewOtherUserId, nickname: "プレビューメンバー", color: "#16a34a" },
-  { id: previewThirdUserId, nickname: "プレビューゲスト", color: "#ea580c" },
+  { id: previewOtherUserId, nickname: "あお", color: "#16a34a" },
+  { id: previewThirdUserId, nickname: "けん", color: "#ea580c" },
+  { id: previewFourthUserId, nickname: "みき", color: "#7c3aed" },
+  { id: previewFifthUserId, nickname: "りさ", color: "#db2777" },
+  { id: previewSixthUserId, nickname: "たくみ", color: "#0891b2" },
+  { id: previewSeventhUserId, nickname: "ゆい", color: "#ca8a04" },
+  { id: previewEighthUserId, nickname: "はる", color: "#dc2626" },
+  { id: previewNinthUserId, nickname: "なお", color: "#4f46e5" },
 ];
 
 const previewEvents: Event[] = [
@@ -61,6 +73,26 @@ const previewSlots: Slot[] = [
   { id: "00000000-0000-4000-8000-000000000041", user_id: previewThirdUserId, date: "2026-08-11", start_time: "20:30", end_time: "23:00", preset_id: null },
   { id: "00000000-0000-4000-8000-000000000042", user_id: previewThirdUserId, date: "2026-08-12", start_time: "11:00", end_time: "13:00", preset_id: null },
   { id: "00000000-0000-4000-8000-000000000043", user_id: previewThirdUserId, date: "2026-08-14", start_time: "18:00", end_time: "21:00", preset_id: null },
+  // 8/11: all nine have a common 20:30–21:30 range, useful for full-match previews.
+  { id: "00000000-0000-4000-8000-000000000044", user_id: previewFourthUserId, date: "2026-08-11", start_time: "20:00", end_time: "22:30", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000045", user_id: previewFifthUserId, date: "2026-08-11", start_time: "20:30", end_time: "23:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000046", user_id: previewSixthUserId, date: "2026-08-11", start_time: "19:30", end_time: "22:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000047", user_id: previewSeventhUserId, date: "2026-08-11", start_time: "20:00", end_time: "23:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000048", user_id: previewEighthUserId, date: "2026-08-11", start_time: "20:30", end_time: "21:30", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000049", user_id: previewNinthUserId, date: "2026-08-11", start_time: "20:00", end_time: "22:00", preset_id: null },
+  // 8/12: seven people overlap, while はる and なお are intentionally unregistered.
+  { id: "00000000-0000-4000-8000-000000000050", user_id: previewCurrentUser.id, date: "2026-08-12", start_time: "20:00", end_time: "22:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000051", user_id: previewOtherUserId, date: "2026-08-12", start_time: "20:00", end_time: "22:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000052", user_id: previewThirdUserId, date: "2026-08-12", start_time: "20:30", end_time: "22:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000053", user_id: previewFourthUserId, date: "2026-08-12", start_time: "20:00", end_time: "21:30", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000054", user_id: previewFifthUserId, date: "2026-08-12", start_time: "20:30", end_time: "22:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000055", user_id: previewSixthUserId, date: "2026-08-12", start_time: "20:00", end_time: "22:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000056", user_id: previewSeventhUserId, date: "2026-08-12", start_time: "20:30", end_time: "21:30", preset_id: null },
+  // Mixed availability on 8/13 and 8/14 exercises sparse week rows and registration badges.
+  { id: "00000000-0000-4000-8000-000000000057", user_id: previewFourthUserId, date: "2026-08-13", start_time: "18:00", end_time: "21:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000058", user_id: previewFifthUserId, date: "2026-08-13", start_time: "19:00", end_time: "22:00", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000059", user_id: previewSixthUserId, date: "2026-08-14", start_time: "18:30", end_time: "21:30", preset_id: null },
+  { id: "00000000-0000-4000-8000-000000000060", user_id: previewEighthUserId, date: "2026-08-14", start_time: "20:00", end_time: "22:30", preset_id: null },
 ];
 
 const previewPlanningSlots: Slot[] = [

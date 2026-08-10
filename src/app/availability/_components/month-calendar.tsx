@@ -153,11 +153,11 @@ export function MonthCalendar({
   return (
     <div className="flex h-full flex-col">
       {bestDay && (
-        <div className="flex items-center gap-2 border-b bg-overlap-soft/30 px-3 py-2 text-sm">
+        <div className={cn("items-center gap-2 border-b bg-overlap-soft/30 px-3 py-2 text-sm", bestDay.fullMatch ? "flex" : "hidden sm:flex")}>
           <span className="min-w-0 flex-1 font-medium text-overlap-foreground">
             {bestDay.fullMatch
               ? `${format(new Date(`${bestDay.date}T00:00:00`), "M/d (E)", { locale: ja })} 全員OK ${formatCommonRange(bestDay.commonRanges)}`
-              : `${format(new Date(`${bestDay.date}T00:00:00`), "M/d (E)", { locale: ja })} ${bestDay.registeredIds.length}人OK ${formatCommonRange(bestDay.commonRanges)}（${bestDay.unregisteredIds.map(nickname).join("・")}未登録）`}
+              : `${format(new Date(`${bestDay.date}T00:00:00`), "M/d (E)", { locale: ja })} ${bestDay.registeredIds.length}人OK ${formatCommonRange(bestDay.commonRanges)}・未登録${bestDay.unregisteredIds.length}人`}
           </span>
           <button type="button" className="shrink-0 rounded border px-2 py-1 text-xs hover:bg-background" onClick={() => onSelectDate?.(bestDay.date)}>詳細を見る</button>
         </div>
@@ -192,6 +192,7 @@ export function MonthCalendar({
                 editable && canEdit && activePreset && "cursor-pointer",
                 !editable && "bg-muted/50",
                 dragging && "touch-none",
+                summary?.registeredIds.length === 0 && "availability-unregistered",
               )}
               style={{ touchAction: canEdit && activePreset && editable ? "none" : "auto", ...(canEdit && (isVisitedNow || applied) && activePreset ? { backgroundColor: `color-mix(in oklab, ${activePreset.color} 14%, var(--card))`, borderLeft: `3px solid ${activePreset.color}` } : {}) }}
             >
@@ -210,7 +211,7 @@ export function MonthCalendar({
                 </div>
               )}
               {summary?.softMatch && !summary.fullMatch && (
-                <div className="rounded bg-overlap-soft/40 px-1 py-0.5 text-[11px] leading-tight text-overlap-foreground">
+                <div className="overlap-soft-block hidden rounded px-1 py-0.5 text-[11px] leading-tight text-overlap-foreground sm:block">
                   {summary.registeredIds.length}人OK <span className="text-warning-foreground">({summary.unregisteredIds.map(nickname).join("・")}未登録)</span>
                 </div>
               )}
@@ -220,6 +221,7 @@ export function MonthCalendar({
                 ))}
               </div>
               {selfSlots.length > 0 && <span className="text-[10px] text-free-foreground">{formatTimeLabel(selfSlots[0].start_time)}〜</span>}
+              {!canEdit && <span className="pointer-events-none mt-auto self-end text-[10px] text-muted-foreground">詳細 ›</span>}
             </div>
           );
         })}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
+import { addDays, addMonths, eachDayOfInterval, endOfMonth, format, isSameMonth, startOfMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
 import { ChevronLeft, ChevronRight, X, ArrowLeft } from "lucide-react";
@@ -81,7 +81,8 @@ export function AvailabilityBoard({
   const canActivatePreset = editing && selfVisible;
   const activePreset = canActivatePreset ? presets.find((p) => p.id === activePresetId) ?? null : null;
 
-  const range = useMemo(() => viewMode === "month" ? monthGridRange(cursorDate) : { start: startOfWeek(cursorDate, { weekStartsOn: 0 }), end: endOfWeek(cursorDate, { weekStartsOn: 0 }) }, [cursorDate, viewMode]);
+  // The detail view intentionally focuses on the selected date and its adjacent days.
+  const range = useMemo(() => viewMode === "month" ? monthGridRange(cursorDate) : { start: addDays(cursorDate, -1), end: addDays(cursorDate, 1) }, [cursorDate, viewMode]);
 
   const fetchSlots = useCallback(async () => {
     if (preview) return;
@@ -168,10 +169,10 @@ export function AvailabilityBoard({
   }, [hasDraft]);
 
   function goPrev() {
-    setCursorDate((d) => viewMode === "month" ? addMonths(d, -1) : addWeeks(d, -1));
+    setCursorDate((d) => viewMode === "month" ? addMonths(d, -1) : addDays(d, -3));
   }
   function goNext() {
-    setCursorDate((d) => viewMode === "month" ? addMonths(d, 1) : addWeeks(d, 1));
+    setCursorDate((d) => viewMode === "month" ? addMonths(d, 1) : addDays(d, 3));
   }
   function goToday() {
     setCursorDate(jstNow());

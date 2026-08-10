@@ -47,7 +47,7 @@ export function MemberList({
                 <span className="ml-auto shrink-0 rounded bg-warning-soft px-1.5 py-0.5 text-[10px] text-warning-foreground">未登録</span>
               )}
               {(registrationStatus?.get(m.id)?.registered ?? 0) > 0 && (registrationStatus?.get(m.id)?.registered ?? 0) < (registrationStatus?.get(m.id)?.total ?? 0) * 0.3 && (
-                <span className="ml-auto shrink-0 text-[10px] text-muted-foreground">{registrationStatus?.get(m.id)?.registered}日</span>
+                <span className="ml-auto flex shrink-0 items-center gap-1 text-[10px] text-muted-foreground"><span>{registrationStatus?.get(m.id)?.registered} / {registrationStatus?.get(m.id)?.total}日</span><span className="h-1 w-8 overflow-hidden rounded-full bg-muted" role="progressbar" aria-valuemin={0} aria-valuemax={registrationStatus?.get(m.id)?.total} aria-valuenow={registrationStatus?.get(m.id)?.registered} aria-label={`${m.nickname} 登録状況`}><span className="block h-full bg-primary" style={{ width: `${((registrationStatus?.get(m.id)?.registered ?? 0) / (registrationStatus?.get(m.id)?.total || 1)) * 100}%` }} /></span></span>
               )}
             </label>
           </li>

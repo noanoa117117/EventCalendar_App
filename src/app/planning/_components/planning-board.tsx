@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { addDays, format, isToday, startOfWeek } from "date-fns";
 import { ja } from "date-fns/locale";
 import { toast } from "sonner";
@@ -23,28 +23,41 @@ interface Window {
   end: number;
 }
 
-export function PlanningBoard({ currentUser, members, initialSlots = [], preview = false, onEventCreated }: { currentUser: Profile; members: Profile[]; initialSlots?: Slot[]; preview?: boolean; onEventCreated?: (event: { id: string }) => void }) {
-  const [week, setWeek] = useState(() => startOfWeek(new Date(`${jstToday()}T12:00:00`), { weekStartsOn: 1 }));
-  const [selectedIds, setSelectedIds] = useState(() => new Set([currentUser.id]));
+export function PlanningBoard({ currentUser, members, initialSlots = [], preview = false, onEventCreated, initialDate, initialStart, initialMemberIds }: { currentUser: Profile; members: Profile[]; initialSlots?: Slot[]; preview?: boolean; onEventCreated?: (event: { id: string }) => void; initialDate?: string; initialStart?: string; initialMemberIds?: string[] }) {
+  const searchParams = useSearchParams();
+  // Read the URL as a client-side fallback so a client navigation always keeps its preselection.
+  const routeDate = initialDate ?? searchParams.get("date") ?? undefined;
+  const routeStart = initialStart ?? searchParams.get("start") ?? undefined;
+  const routeMemberIds = initialMemberIds ?? (searchParams.get("members")?.split(",") ?? []);
+  const safeRouteDate = routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate) ? routeDate : undefined;
+  const safeRouteStart = routeStart && /^(?:[01]\d|2[0-3]):(?:00|30)$/.test(routeStart) ? routeStart : undefined;
+  const initialSelectedDate = safeRouteDate ? new Date(`${safeRouteDate}T12:00:00`) : new Date(`${jstToday()}T12:00:00`);
+  const validInitialIds = Array.from(new Set(routeMemberIds.filter((id) => members.some((member) => member.id === id))));
+  const [week, setWeek] = useState(() => startOfWeek(initialSelectedDate, { weekStartsOn: 1 }));
+  const [selectedIds, setSelectedIds] = useState(() => new Set(validInitialIds.length ? validInitialIds : [currentUser.id]));
   const [slots, setSlots] = useState<Slot[]>(initialSlots);
   const [picked, setPicked] = useState<{ date: string; start: number } | null>(null);
   const [duration, setDuration] = useState(60);
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
+  const [slotsReady, setSlotsReady] = useState(preview);
+  const initialSelectionApplied = useRef(false);
   const router = useRouter();
   const request = useRef(0);
   const days = useMemo(() => Array.from({ length: 7 }, (_, i) => addDays(week, i)), [week]);
   const dates = useMemo(() => days.map((day) => format(day, "yyyy-MM-dd")), [days]);
 
   const fetchSlots = useCallback(async () => {
-    if (preview) return;
-    if (selectedIds.size === 0) { setLoading(false); setSlots([]); return; }
+    if (preview) { setSlotsReady(true); return; }
+    if (selectedIds.size === 0) { setLoading(false); setSlots([]); setSlotsReady(true); return; }
     const generation = ++request.current;
     setLoading(true);
+    setSlotsReady(false);
     const { data, error } = await createClient().from("availability_slots").select("*")
       .in("user_id", Array.from(selectedIds)).gte("date", dates[0]).lte("date", dates[6]);
     if (generation !== request.current) return;
     setLoading(false);
+    setSlotsReady(true);
     if (error) { toast.error("空き時間の取得に失敗しました。"); return; }
     setSlots(data ?? []);
   }, [dates, preview, selectedIds]);
@@ -111,6 +124,20 @@ export function PlanningBoard({ currentUser, members, initialSlots = [], preview
   const pickedWindow = picked
     ? commonWindows.find((d) => d.date === picked.date)?.windows.find((w) => picked.start >= w.start && picked.start < w.end) ?? null
     : null;
+
+  // Initial query selection is applied after availability arrives.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+  useEffect(() => {
+    if (initialSelectionApplied.current || !slotsReady || !safeRouteDate || !safeRouteStart) return;
+    const [hour, minute] = safeRouteStart.split(":").map(Number);
+    const start = hour * 60 + minute;
+    if (canUse(safeRouteDate, start, 30)) {
+      setPicked({ date: safeRouteDate, start });
+      setDuration(30);
+    }
+    initialSelectionApplied.current = true;
+  }, [commonWindows, safeRouteDate, safeRouteStart, slotsReady]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   async function createEvent() {
     if (!picked || !title.trim() || !canUse(picked.date, picked.start, duration)) {

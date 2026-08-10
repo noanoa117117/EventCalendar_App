@@ -39,6 +39,11 @@ test("1人だけのスロットは softMatch にしない", () => {
   assert.equal(summary.softMatch, false);
 });
 
+test("表示対象が1人だけなら全員OKとして強調しない", () => {
+  const summary = computeDaySummaries([date], members, ["a"], [slot("a")]).get(date)!;
+  assert.equal(summary.fullMatch, false);
+});
+
 test("複数スロットの union を取ってから30分単位で intersection する", () => {
   const summary = computeDaySummaries([date], members.slice(0, 2), ["a", "b"], [slot("a", "09:00", "10:00"), slot("a", "10:00", "12:00"), slot("b", "09:30", "11:30")]).get(date)!;
   assert.deepEqual(summary.commonRanges, [{ start_time: "09:30", end_time: "11:30" }]);
