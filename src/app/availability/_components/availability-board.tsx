@@ -183,7 +183,16 @@ export function AvailabilityBoard({
     const dates = eachDayOfInterval(range)
       .filter((date) => viewMode === "week" || isSameMonth(date, cursorDate))
       .map((date) => format(date, "yyyy-MM-dd"));
-    return new Map(members.filter((member) => visibleIds.has(member.id)).map((member) => [member.id, { registered: dates.filter((date) => projectedSlots.some((slot) => slot.user_id === member.id && slot.date === date)).length, total: dates.length }]));
+    const visible = new Set(members.filter((member) => visibleIds.has(member.id)).map((member) => member.id));
+    const dateSet = new Set(dates);
+    const registeredDates = new Map<string, Set<string>>();
+    for (const slot of projectedSlots) {
+      if (!visible.has(slot.user_id) || !dateSet.has(slot.date)) continue;
+      const set = registeredDates.get(slot.user_id) ?? new Set<string>();
+      set.add(slot.date);
+      registeredDates.set(slot.user_id, set);
+    }
+    return new Map(Array.from(visible, (id) => [id, { registered: registeredDates.get(id)?.size ?? 0, total: dates.length }]));
   }, [members, projectedSlots, range, viewMode, cursorDate, visibleIds]);
 
   const [mobilePanel, setMobilePanel] = useState<"calendar" | "members">("calendar");

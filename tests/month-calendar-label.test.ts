@@ -13,6 +13,7 @@ test("month availability uses member dots and overlap labels", () => {
   assert.match(source, /未登録\$\{bestDay\.unregisteredIds\.length\}人/);
   assert.match(source, /availability-unregistered/);
   assert.match(source, /詳細 ›/);
+  assert.match(source, /singleMemberSlots/);
 });
 
 test("month label times preserve full ranges and recognize the all-day boundary", () => {

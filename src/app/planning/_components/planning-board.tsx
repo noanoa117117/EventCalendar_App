@@ -25,7 +25,8 @@ interface Window {
 
 export function PlanningBoard({ currentUser, members, initialSlots = [], preview = false, onEventCreated, initialDate, initialStart, initialMemberIds }: { currentUser: Profile; members: Profile[]; initialSlots?: Slot[]; preview?: boolean; onEventCreated?: (event: { id: string }) => void; initialDate?: string; initialStart?: string; initialMemberIds?: string[] }) {
   const searchParams = useSearchParams();
-  // Read the URL as a client-side fallback so a client navigation always keeps its preselection.
+  // Server props are canonical. This fallback preserves preselection when a client-side
+  // navigation reaches this Client Component before its server-provided props update.
   const routeDate = initialDate ?? searchParams.get("date") ?? undefined;
   const routeStart = initialStart ?? searchParams.get("start") ?? undefined;
   const routeMemberIds = initialMemberIds ?? (searchParams.get("members")?.split(",") ?? []);

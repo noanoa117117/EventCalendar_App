@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { addDays, format } from "date-fns";
 import { ja } from "date-fns/locale";
@@ -15,6 +15,7 @@ import {
   startMinutes,
 } from "@/lib/availability";
 import type { Preset, Profile, Slot } from "@/lib/types";
+import { useDragPaint } from "./use-drag-paint";
 
 function displayTime(minutes: number) {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
@@ -79,63 +80,14 @@ export function WeekCalendar({
     return Array.from({ length: Math.max(1, (max - min) / 30) }, (_, index) => min + index * 30);
   }, [slots, visibleIds]);
 
-  const [dragging, setDragging] = useState(false);
-  const [visited, setVisited] = useState<Set<string>>(new Set());
-  const draggingRef = useRef(false);
-  const visitedRef = useRef(new Set<string>());
-  const actionRef = useRef<"apply" | "remove" | null>(null);
-  const presetRef = useRef(activePreset);
-  const onPaintRef = useRef(onPaint);
-
-  useEffect(() => {
-    presetRef.current = activePreset;
-    onPaintRef.current = onPaint;
-  }, [activePreset, onPaint]);
-
-  useEffect(() => {
-    function finish(cancel = false) {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      setDragging(false);
-      if (!cancel && presetRef.current && actionRef.current && visitedRef.current.size) {
-        onPaintRef.current(Array.from(visitedRef.current), actionRef.current, presetRef.current);
-      }
-      visitedRef.current = new Set();
-      setVisited(new Set());
-    }
-    function move(event: PointerEvent) {
-      if (!draggingRef.current) return;
-      event.preventDefault();
-      const element = document.elementFromPoint(event.clientX, event.clientY) as HTMLElement | null;
-      const date = element?.closest<HTMLElement>("[data-week-date]")?.dataset.weekDate;
-      if (!date || !presetRef.current || !isDateEditable(date, editableWindow) || visitedRef.current.has(date)) return;
-      visitedRef.current = new Set(visitedRef.current).add(date);
-      setVisited(new Set(visitedRef.current));
-    }
-    const onUp = () => finish();
-    const cancel = () => finish(true);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", cancel);
-    window.addEventListener("pointermove", move, { passive: false });
-    return () => {
-      window.removeEventListener("pointerup", onUp);
-      window.removeEventListener("pointercancel", cancel);
-      window.removeEventListener("pointermove", move);
-    };
-  }, [editableWindow]);
-
-  function isAppliedByActivePreset(date: string) {
+  const isAppliedByActivePreset = (date: string) => {
     return Boolean(activePreset && isRangeCovered(slotsByUserDate.get(`${currentUserId}|${date}`) ?? [], activePreset.start_time, activePreset.end_time));
-  }
-  function startPaint(date: string, event: React.PointerEvent) {
-    if (!canEdit || !activePreset || !isDateEditable(date, editableWindow)) return;
-    event.preventDefault();
-    draggingRef.current = true;
-    actionRef.current = isAppliedByActivePreset(date) ? "remove" : "apply";
-    visitedRef.current = new Set([date]);
-    setVisited(new Set([date]));
-    setDragging(true);
-  }
+  };
+  const { dragging, visited, draggingRef, onPointerDown: startPaint, onPointerEnter } = useDragPaint({ canEdit, activePreset, onPaint, isEditable: (date) => isDateEditable(date, editableWindow), isApplied: isAppliedByActivePreset, selector: "[data-week-date]" });
+  const navigateToPlanning = (date: string, start: string) => {
+    const params = new URLSearchParams({ date, start, members: visibleMembers.map((member) => member.id).join(",") });
+    router.push(`/planning?${params.toString()}`);
+  };
 
   return (
     <div className="h-full overflow-auto">
@@ -168,19 +120,18 @@ export function WeekCalendar({
                   key={`${date}-${minute}`}
                   data-week-date={date}
                   onPointerDown={(event) => startPaint(date, event)}
+                  onPointerEnter={() => onPointerEnter(date)}
                   role={canOpenPlanning ? "button" : undefined}
                   tabIndex={canOpenPlanning ? 0 : undefined}
                   aria-label={canOpenPlanning ? `${date} ${displayTime(minute)} 全員の共通空き時間から企画` : undefined}
                   onClick={() => {
                     if (!canOpenPlanning || draggingRef.current) return;
-                    const params = new URLSearchParams({ date, start: cellStart, members: visibleMembers.map((member) => member.id).join(",") });
-                    router.push(`/planning?${params.toString()}`);
+                    navigateToPlanning(date, cellStart);
                   }}
                   onKeyDown={(event) => {
                     if (canOpenPlanning && (event.key === "Enter" || event.key === " ")) {
                       event.preventDefault();
-                      const params = new URLSearchParams({ date, start: cellStart, members: visibleMembers.map((member) => member.id).join(",") });
-                      router.push(`/planning?${params.toString()}`);
+                      navigateToPlanning(date, cellStart);
                     }
                   }}
                   className={cn("relative h-7 border-b border-l px-0.5", isFullOverlap && "overlap-block", isSoftOverlap && !isFullOverlap && "overlap-soft-block", canEdit && activePreset && isDateEditable(date, editableWindow) && "cursor-pointer", dragging && "touch-none", visited.has(date) && "ring-1 ring-inset ring-primary/50")}

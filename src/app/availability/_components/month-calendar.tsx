@@ -1,12 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
 import { addDays, format, isSameMonth } from "date-fns";
 import { ja } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { computeDaySummaries, formatTimeLabel, isDateEditable, isRangeCovered, monthGridRange, startMinutes, endMinutes } from "@/lib/availability";
 import type { TimeRange } from "@/lib/availability";
 import type { Preset, Profile, Slot } from "@/lib/types";
+import { useDragPaint } from "./use-drag-paint";
 
 const WEEKDAY_LABELS = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -61,94 +62,17 @@ export function MonthCalendar({
     return candidates.reduce<typeof candidates[number] | null>((best, summary) => {
       const longest = Math.max(...summary.commonRanges.map((range) => endMinutes(range.end_time) - startMinutes(range.start_time)));
       const bestLongest = best ? Math.max(...best.commonRanges.map((range) => endMinutes(range.end_time) - startMinutes(range.start_time))) : -1;
-      return longest > bestLongest ? summary : best;
+      return longest > bestLongest || (longest === bestLongest && summary.fullMatch && !best?.fullMatch) ? summary : best;
     }, null);
   }, [summaries]);
 
-  const [dragging, setDragging] = useState(false);
-  const [visited, setVisited] = useState<Set<string>>(new Set());
-  const draggingRef = useRef(false);
-  const visitedRef = useRef(new Set<string>());
-  const actionRef = useRef<"apply" | "remove" | null>(null);
-  const presetRef = useRef(activePreset);
-  // The global pointer listeners mount once, so dispatch through the current render's callback.
-  const onPaintRef = useRef(onPaint);
-  onPaintRef.current = onPaint;
-  useEffect(() => { presetRef.current = activePreset; }, [activePreset]);
-
-  useEffect(() => {
-    function finish(cancel = false) {
-      if (!draggingRef.current) return;
-      draggingRef.current = false;
-      setDragging(false);
-      if (!cancel && presetRef.current && actionRef.current && visitedRef.current.size > 0) {
-        onPaintRef.current(Array.from(visitedRef.current), actionRef.current, presetRef.current);
-      }
-      visitedRef.current = new Set();
-      setVisited(new Set());
-    }
-    function move(e: PointerEvent) {
-      if (!draggingRef.current) return;
-      e.preventDefault();
-      const el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
-      const date = el?.closest<HTMLElement>("[data-date]")?.dataset.date;
-      if (date) handlePointerEnter(date);
-    }
-    const onUp = () => finish();
-    const onCancel = () => finish(true);
-    window.addEventListener("pointerup", onUp);
-    window.addEventListener("pointercancel", onCancel);
-    window.addEventListener("pointermove", move, { passive: false });
-    return () => { window.removeEventListener("pointerup", onUp); window.removeEventListener("pointercancel", onCancel); window.removeEventListener("pointermove", move); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && draggingRef.current) {
-        draggingRef.current = false;
-        visitedRef.current = new Set();
-        setDragging(false);
-        setVisited(new Set());
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
-
-  function isEditable(dateStr: string) {
-    return isDateEditable(dateStr, editableWindow);
-  }
-
-  function isAppliedByActivePreset(dateStr: string) {
+  const isEditable = (dateStr: string) => isDateEditable(dateStr, editableWindow);
+  const isAppliedByActivePreset = (dateStr: string) => {
     if (!activePreset) return false;
     const daySlots = slotsByUserDate.get(`${currentUserId}|${dateStr}`) ?? [];
     return isRangeCovered(daySlots, activePreset.start_time, activePreset.end_time);
-  }
-
-  function handlePointerDown(dateStr: string, e?: React.PointerEvent) {
-    if (!canEdit || !activePreset || !isEditable(dateStr)) return;
-    e?.preventDefault();
-    draggingRef.current = true;
-    setDragging(true);
-    const applied = isAppliedByActivePreset(dateStr);
-    actionRef.current = applied ? "remove" : "apply";
-    visitedRef.current = new Set([dateStr]);
-    setVisited(visitedRef.current);
-  }
-
-  function handlePointerEnter(dateStr: string) {
-    if (!canEdit || !draggingRef.current || !presetRef.current || !isEditable(dateStr)) return;
-    visitedRef.current = new Set(visitedRef.current);
-    if (visitedRef.current.has(dateStr)) return;
-    visitedRef.current.add(dateStr);
-    setVisited((prev) => {
-      if (prev.has(dateStr)) return prev;
-      const next = new Set(prev);
-      next.add(dateStr);
-      return next;
-    });
-  }
+  };
+  const { dragging, visited, onPointerDown, onPointerEnter } = useDragPaint({ canEdit, activePreset, onPaint, isEditable, isApplied: isAppliedByActivePreset });
 
   return (
     <div className="flex h-full flex-col">
@@ -178,13 +102,15 @@ export function MonthCalendar({
           const isVisitedNow = visited.has(dateStr);
           const summary = summaries.get(dateStr);
           const selfSlots = slotsByUserDate.get(`${currentUserId}|${dateStr}`) ?? [];
+          const singleMember = visibleMembers.length === 1 ? visibleMembers[0] : null;
+          const singleMemberSlots = singleMember ? slotsByUserDate.get(`${singleMember.id}|${dateStr}`) ?? [] : [];
 
           return (
             <div
               key={dateStr}
               data-date={dateStr}
-              onPointerDown={(e) => handlePointerDown(dateStr, e)}
-              onPointerEnter={() => handlePointerEnter(dateStr)}
+              onPointerDown={(e) => onPointerDown(dateStr, e)}
+              onPointerEnter={() => onPointerEnter(dateStr)}
               onClick={() => { if ((!canEdit || !activePreset) && onSelectDate) onSelectDate(dateStr); }}
               className={cn(
                 "flex select-none flex-col gap-1 p-1.5 text-left align-top",
@@ -220,7 +146,12 @@ export function MonthCalendar({
                   <span key={m.id} className={cn("size-1.5 rounded-full", !summary?.registeredIds.includes(m.id) && "bg-muted-foreground/20")} style={summary?.registeredIds.includes(m.id) ? { backgroundColor: m.color } : undefined} title={`${m.nickname}: ${summary?.registeredIds.includes(m.id) ? "登録済み" : "未登録"}`} aria-label={`${m.nickname}: ${summary?.registeredIds.includes(m.id) ? "登録済み" : "未登録"}`} />
                 ))}
               </div>
-              {selfSlots.length > 0 && <span className="text-[10px] text-free-foreground">{formatTimeLabel(selfSlots[0].start_time)}〜</span>}
+              {singleMemberSlots.length > 0 && (
+                <div className="flex flex-wrap gap-x-1 text-[10px] text-free-foreground" title={singleMemberSlots.map((slot) => `${formatTimeLabel(slot.start_time)}〜${formatTimeLabel(slot.end_time, true)}`).join("、")}>
+                  {[...singleMemberSlots].sort((a, b) => a.start_time.localeCompare(b.start_time)).map((slot) => <span key={slot.id}>{formatTimeLabel(slot.start_time)}〜{formatTimeLabel(slot.end_time, true)}</span>)}
+                </div>
+              )}
+              {visibleMembers.length !== 1 && selfSlots.length > 0 && <span className="text-[10px] text-free-foreground">{formatTimeLabel(selfSlots[0].start_time)}〜</span>}
               {!canEdit && <span className="pointer-events-none mt-auto self-end text-[10px] text-muted-foreground">詳細 ›</span>}
             </div>
           );
