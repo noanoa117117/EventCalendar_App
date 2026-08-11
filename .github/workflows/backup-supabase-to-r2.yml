@@ -1,0 +1,158 @@
+name: Backup Supabase to R2
+
+on:
+  workflow_dispatch:
+
+  schedule:
+    # JST 03:23 / 09:23 / 15:23 / 21:23
+    - cron: "23 3,9,15,21 * * *"
+      timezone: "Asia/Tokyo"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-r2-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+
+      R2_ACCOUNT_ID: ${{ vars.R2_ACCOUNT_ID }}
+      R2_BUCKET_NAME: ${{ vars.R2_BUCKET_NAME }}
+
+      LATEST_KEY: invitation-event-calendar/latest.tar.gz
+      PREVIOUS_KEY: invitation-event-calendar/previous.tar.gz
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Show tool versions
+        run: |
+          set -euo pipefail
+          supabase --version
+          aws --version
+
+      - name: Dump database
+        run: |
+          set -euo pipefail
+
+          mkdir -p backup
+
+          supabase db dump \
+            --db-url "$SUPABASE_DB_URL" \
+            --file backup/roles.sql \
+            --role-only
+
+          supabase db dump \
+            --db-url "$SUPABASE_DB_URL" \
+            --file backup/schema.sql
+
+          supabase db dump \
+            --db-url "$SUPABASE_DB_URL" \
+            --file backup/data.sql \
+            --data-only \
+            --use-copy \
+            --exclude "storage.buckets_vectors" \
+            --exclude "storage.vector_indexes"
+
+      - name: Validate dump files
+        run: |
+          set -euo pipefail
+
+          test -s backup/roles.sql
+          test -s backup/schema.sql
+          test -s backup/data.sql
+
+          sha256sum \
+            backup/roles.sql \
+            backup/schema.sql \
+            backup/data.sql \
+            > backup/SHA256SUMS
+
+          GENERATED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+
+          {
+            echo "generated_at=$GENERATED_AT"
+            echo "repository=$GITHUB_REPOSITORY"
+            echo "workflow_run_id=$GITHUB_RUN_ID"
+            echo "workflow_run_attempt=$GITHUB_RUN_ATTEMPT"
+            echo "supabase_cli_version=$(supabase --version)"
+          } > backup/manifest.txt
+
+          tar -C backup -czf supabase-backup.tar.gz .
+
+          test -s supabase-backup.tar.gz
+
+      - name: Rotate latest to previous
+        run: |
+          set -euo pipefail
+
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          if aws s3api head-object \
+            --bucket "$R2_BUCKET_NAME" \
+            --key "$LATEST_KEY" \
+            --endpoint-url "$ENDPOINT" \
+            >/dev/null 2>&1
+          then
+            aws s3 cp \
+              "s3://${R2_BUCKET_NAME}/${LATEST_KEY}" \
+              "s3://${R2_BUCKET_NAME}/${PREVIOUS_KEY}" \
+              --endpoint-url "$ENDPOINT" \
+              --no-progress
+          else
+            echo "Existing latest backup was not found; skipping rotation."
+          fi
+
+      - name: Upload new latest backup
+        run: |
+          set -euo pipefail
+
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+          CHECKSUM="$(sha256sum supabase-backup.tar.gz | awk '{print $1}')"
+
+          aws s3 cp \
+            supabase-backup.tar.gz \
+            "s3://${R2_BUCKET_NAME}/${LATEST_KEY}" \
+            --endpoint-url "$ENDPOINT" \
+            --metadata "sha256=${CHECKSUM}" \
+            --no-progress
+
+      - name: Verify uploaded object
+        run: |
+          set -euo pipefail
+
+          ENDPOINT="https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com"
+
+          LOCAL_SIZE="$(stat -c '%s' supabase-backup.tar.gz)"
+
+          REMOTE_SIZE="$(
+            aws s3api head-object \
+              --bucket "$R2_BUCKET_NAME" \
+              --key "$LATEST_KEY" \
+              --endpoint-url "$ENDPOINT" \
+              --query ContentLength \
+              --output text
+          )"
+
+          test "$LOCAL_SIZE" = "$REMOTE_SIZE"
+
+          echo "Backup completed successfully."
+          echo "Object: s3://${R2_BUCKET_NAME}/${LATEST_KEY}"
+          echo "Size: ${REMOTE_SIZE} bytes"
