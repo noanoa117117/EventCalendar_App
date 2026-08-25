@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { addMonths, addWeeks, eachDayOfInterval, endOfMonth, endOfWeek, format, isSameDay, isSameMonth, startOfMonth, startOfWeek, subMonths, subWeeks } from "date-fns";
 import { ja } from "date-fns/locale";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
@@ -174,7 +174,22 @@ function EventDetail({ event, participants, names, currentUser, onRespond, onEdi
   return <div className="space-y-4"><div className="flex items-start justify-between gap-2"><div><p className="text-xs text-muted-foreground">{event.status === "cancelled" ? "キャンセル済み" : "イベント詳細"}</p><h2 className="text-xl font-semibold">{event.title}</h2><p className="text-sm text-muted-foreground">主催: {names.get(event.created_by)?.nickname ?? "メンバー"}</p></div>{event.created_by === currentUser.id && event.status !== "cancelled" && <div className="flex"><Button variant="ghost" size="icon" aria-label="編集" onClick={onEdit}><Pencil /></Button><Button variant="ghost" size="icon" aria-label="キャンセル" onClick={onCancel}><CircleX /></Button></div>}</div><p className="text-sm">{startDateLabel} {startTimeLabel}{sameDay ? `–${endTimeLabel}` : <><br />〜 {endDateLabel} {endTimeLabel}</>}</p>{event.description && <p className="whitespace-pre-wrap text-sm text-muted-foreground">{event.description}</p>}{event.status !== "cancelled" && <div className="space-y-2"><p className="flex items-center gap-1 text-sm font-medium"><Users className="size-4" />参加表明</p><div className="flex flex-wrap gap-2">{(Object.keys(statusLabel) as EventParticipantStatus[]).map((status) => <Button key={status} size="sm" variant={mine === status ? "default" : "outline"} onClick={() => onRespond(status)}>{statusLabel[status]}</Button>)}</div><p className="text-xs text-muted-foreground">参加表明済み {participants.length}名</p></div>}<div className="space-y-3 border-t pt-3 text-sm">{grouped.map((group) => <div key={group.status}><p className="mb-1 font-medium">{statusLabel[group.status]} ({group.people.length}名)</p><div className="space-y-1">{group.people.map((participant) => <div key={participant.user_id} className="text-muted-foreground">{names.get(participant.user_id)?.nickname ?? "メンバー"}</div>)}</div></div>)}{!participants.length && <p className="text-muted-foreground">まだ参加表明はありません。</p>}</div>{!preview && event.google_sync_status && <div className="border-t pt-3 text-xs">{event.google_sync_status === "synced" && <p className="text-muted-foreground">Googleカレンダーに同期済み</p>}{event.google_sync_status === "pending" && <p className="text-muted-foreground">同期中...</p>}{event.google_sync_status === "failed" && <div className="space-y-1"><p className="text-destructive">同期失敗{event.google_sync_error ? `: ${event.google_sync_error}` : ""}</p>{event.created_by === currentUser.id && <Button size="sm" variant="outline" onClick={onResync}>再同期</Button>}</div>}</div>}</div>;
 }
 
-function EventForm({ event, onSubmit, onClose }: { event: Event | null; onSubmit: (form: FormData) => void; onClose: () => void }) {
+function EventForm({ event, onSubmit, onClose }: { event: Event | null; onSubmit: (form: FormData) => Promise<void>; onClose: () => void }) {
   const local = (value?: string) => value ? formatInTimeZone(new Date(value), "Asia/Tokyo", "yyyy-MM-dd'T'HH:mm") : "";
-  return <form action={onSubmit} className="space-y-4"><h2 className="text-lg font-semibold">{event ? "イベントを編集" : "イベントを作成"}</h2><label className="block space-y-1 text-sm">タイトル<Input name="title" required defaultValue={event?.title ?? ""} /></label><label className="block space-y-1 text-sm">開始（日本時間）<Input name="start" type="datetime-local" required defaultValue={local(event?.start_at)} /></label><label className="block space-y-1 text-sm">終了（日本時間）<Input name="end" type="datetime-local" required defaultValue={local(event?.end_at)} /></label><label className="block space-y-1 text-sm">説明<textarea name="description" defaultValue={event?.description ?? ""} className="min-h-24 w-full rounded-lg border bg-transparent p-2 text-sm" /></label><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={onClose}>閉じる</Button><Button type="submit">保存</Button></div></form>;
+  const submittingRef = useRef(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function submitOnce(form: FormData) {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setIsSubmitting(true);
+    try {
+      await onSubmit(form);
+    } finally {
+      submittingRef.current = false;
+      setIsSubmitting(false);
+    }
+  }
+
+  return <form action={submitOnce} className="space-y-4"><h2 className="text-lg font-semibold">{event ? "イベントを編集" : "イベントを作成"}</h2><label className="block space-y-1 text-sm">タイトル<Input name="title" required defaultValue={event?.title ?? ""} /></label><label className="block space-y-1 text-sm">開始（日本時間）<Input name="start" type="datetime-local" required defaultValue={local(event?.start_at)} /></label><label className="block space-y-1 text-sm">終了（日本時間）<Input name="end" type="datetime-local" required defaultValue={local(event?.end_at)} /></label><label className="block space-y-1 text-sm">説明<textarea name="description" defaultValue={event?.description ?? ""} className="min-h-24 w-full rounded-lg border bg-transparent p-2 text-sm" /></label><div className="flex justify-end gap-2"><Button type="button" variant="outline" onClick={() => { if (!submittingRef.current) onClose(); }} disabled={isSubmitting}>閉じる</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting ? "保存中..." : "保存"}</Button></div></form>;
 }
