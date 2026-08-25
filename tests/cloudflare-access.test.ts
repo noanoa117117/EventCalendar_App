@@ -11,14 +11,16 @@ import {
 } from "../src/lib/cloudflare-access.ts";
 import { generateSupabaseMagicLink, generateSupabaseMagicLinkIfAllowed, safeNextPath } from "../src/lib/cloudflare-auth-bridge.ts";
 
-const { privateKey, publicKey } = await generateKeyPair("RS256");
-const jwk = await exportJWK(publicKey);
+let privateKey: Awaited<ReturnType<typeof generateKeyPair>>["privateKey"];
 const issuer = "https://team.example.cloudflareaccess.com";
-globalThis.fetch = async () => new Response(JSON.stringify({
-  keys: [{ ...jwk, kid: "current", alg: "RS256", use: "sig" }],
-}), { headers: { "content-type": "application/json" } });
 
-before(() => {
+before(async () => {
+  const { privateKey: generatedPrivateKey, publicKey } = await generateKeyPair("RS256");
+  privateKey = generatedPrivateKey;
+  const jwk = await exportJWK(publicKey);
+  globalThis.fetch = async () => new Response(JSON.stringify({
+    keys: [{ ...jwk, kid: "current", alg: "RS256", use: "sig" }],
+  }), { headers: { "content-type": "application/json" } });
   process.env.CF_ACCESS_TEAM_DOMAIN = issuer;
   process.env.CF_ACCESS_AUD = "audience";
   process.env.APP_ORIGIN = "https://invitation-event-calendar.amida-solutions.uk";
