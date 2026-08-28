@@ -40,3 +40,8 @@ test("mobile month cells split shared and personal event counts", () => {
   assert.match(calendar, /個人イベント\$\{personalCount\}件/);
   assert.match(calendar, /bg-event-soft[\s\S]*bg-personal-soft/);
 });
+
+test("event form heading identifies shared or personal event kind", () => {
+  assert.match(calendar, /isPersonal \? "個人" : "共有"/);
+  assert.match(calendar, /イベントを\{event \? "編集" : "作成"\}/);
+});
