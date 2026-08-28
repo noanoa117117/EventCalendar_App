@@ -32,3 +32,11 @@ test("calendar exposes both filters and the exact creation choices", () => {
   assert.match(calendar, /共有イベントを確認せずに作成/);
   assert.match(calendar, /個人イベントを作成/);
 });
+
+test("mobile month cells split shared and personal event counts", () => {
+  assert.match(calendar, /const sharedCount = dayEvents\.filter\(\(event\) => !event\.is_personal\)\.length/);
+  assert.match(calendar, /const personalCount = dayEvents\.filter\(\(event\) => event\.is_personal\)\.length/);
+  assert.match(calendar, /共有イベント\$\{sharedCount\}件/);
+  assert.match(calendar, /個人イベント\$\{personalCount\}件/);
+  assert.match(calendar, /bg-event-soft[\s\S]*bg-personal-soft/);
+});
