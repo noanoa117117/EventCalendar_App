@@ -11,6 +11,7 @@ export function isDevPreviewEnabled() {
 
 const previewUserId = "00000000-0000-4000-8000-000000000001";
 const previewEventId = "00000000-0000-4000-8000-000000000010";
+const previewPersonalEventId = "00000000-0000-4000-8000-000000000011";
 const previewOtherUserId = "00000000-0000-4000-8000-000000000002";
 const previewThirdUserId = "00000000-0000-4000-8000-000000000003";
 const previewFourthUserId = "00000000-0000-4000-8000-000000000004";
@@ -43,6 +44,21 @@ const previewEvents: Event[] = [
     created_by: previewCurrentUser.id,
     status: "published",
     created_at: "2026-08-01T00:00:00.000Z",
+    is_personal: false,
+    google_sync_status: null,
+    google_sync_error: null,
+    google_synced_at: null,
+  },
+  {
+    id: previewPersonalEventId,
+    title: "個人イベントのプレビュー",
+    description: "本人だけに表示される予定です。",
+    start_at: "2026-08-13T01:00:00.000Z",
+    end_at: "2026-08-13T02:00:00.000Z",
+    created_by: previewCurrentUser.id,
+    status: "published",
+    created_at: "2026-08-01T00:00:00.000Z",
+    is_personal: true,
     google_sync_status: null,
     google_sync_error: null,
     google_synced_at: null,
@@ -111,8 +127,8 @@ export function getDevPlanningData() {
   return { currentUser: previewCurrentUser, members: previewPeople, initialSlots: previewPlanningSlots };
 }
 
-export function addDevEvent(event: Omit<Event, "id" | "created_at" | "google_sync_status" | "google_sync_error" | "google_synced_at">): Event {
-  const created: Event = { ...event, id: crypto.randomUUID(), created_at: new Date().toISOString(), google_sync_status: null, google_sync_error: null, google_synced_at: null };
+export function addDevEvent(event: Omit<Event, "id" | "created_at" | "is_personal" | "google_sync_status" | "google_sync_error" | "google_synced_at">): Event {
+  const created: Event = { ...event, id: crypto.randomUUID(), created_at: new Date().toISOString(), is_personal: false, google_sync_status: null, google_sync_error: null, google_synced_at: null };
   previewEvents.push(created);
   return created;
 }

@@ -10,7 +10,7 @@ export default async function EventsPage() {
 
   const [{ data: profile }, { data: events }, { data: participants }, { data: role }] = await Promise.all([
     supabase.from("profiles").select("id, nickname, color").eq("id", user.id).single(),
-    supabase.from("events").select("id, title, description, start_at, end_at, created_by, status, created_at, google_sync_status, google_sync_error, google_synced_at").order("start_at"),
+    supabase.from("events").select("id, title, description, start_at, end_at, created_by, status, created_at, is_personal, google_sync_status, google_sync_error, google_synced_at").order("start_at"),
     supabase.from("event_participants").select("event_id, user_id, status, comment, updated_at"),
     supabase.rpc("current_user_role"),
   ]);

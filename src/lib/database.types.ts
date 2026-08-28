@@ -117,6 +117,7 @@ export interface Database {
           created_by: string;
           status: EventStatus;
           created_at: string;
+          is_personal: boolean;
           google_sync_status: GoogleSyncStatus | null;
           google_sync_error: string | null;
           google_synced_at: string | null;
@@ -130,6 +131,7 @@ export interface Database {
           created_by: string;
           status?: EventStatus;
           created_at?: string;
+          is_personal?: boolean;
           google_sync_status?: GoogleSyncStatus | null;
           google_sync_error?: string | null;
           google_synced_at?: string | null;

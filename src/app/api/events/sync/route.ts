@@ -30,22 +30,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  if (!isConfigured()) {
-    return NextResponse.json({ status: "not_configured" });
-  }
-
   const admin = createAdminClient();
   const { data: event } = await admin
     .from("events")
     .select(
-      "id, title, description, start_at, end_at, created_by, status",
+      "id, title, description, start_at, end_at, created_by, status, is_personal",
     )
     .eq("id", eventId)
     .single();
   if (!event) {
     return NextResponse.json({ error: "Event not found" }, { status: 404 });
   }
-
   const perm = checkSyncPermission({
     userId: user.id,
     isAllowed: !!allowed,
@@ -53,6 +48,12 @@ export async function POST(request: Request) {
   });
   if (!perm.ok) {
     return NextResponse.json({ error: perm.error }, { status: perm.status });
+  }
+  if (event.is_personal) {
+    return NextResponse.json({ error: "Personal events cannot be synced" }, { status: 400 });
+  }
+  if (!isConfigured()) {
+    return NextResponse.json({ status: "not_configured" });
   }
 
   await admin

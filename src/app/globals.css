@@ -43,6 +43,9 @@
   --color-event: var(--event);
   --color-event-soft: var(--event-soft);
   --color-event-foreground: var(--event-foreground);
+  --color-personal: var(--personal);
+  --color-personal-soft: var(--personal-soft);
+  --color-personal-foreground: var(--personal-foreground);
   /* 空き = 空き時間が登録されている */
   --color-free: var(--free);
   --color-free-soft: var(--free-soft);
@@ -112,6 +115,9 @@
   --event: oklch(0.535 0.185 272);        /* 確定した予定＝ブランド色 */
   --event-soft: oklch(0.945 0.038 272);
   --event-foreground: oklch(0.32 0.10 272);
+  --personal: oklch(0.575 0.185 25);
+  --personal-soft: oklch(0.955 0.04 25);
+  --personal-foreground: oklch(0.38 0.13 25);
 
   --free: oklch(0.655 0.115 174);         /* #17A28D 空き時間＝ティール */
   --free-soft: oklch(0.955 0.030 174);
@@ -178,6 +184,9 @@
   --event: oklch(0.685 0.155 275);
   --event-soft: oklch(0.36 0.075 275);
   --event-foreground: oklch(0.92 0.03 275);
+  --personal: oklch(0.685 0.175 25);
+  --personal-soft: oklch(0.34 0.075 25);
+  --personal-foreground: oklch(0.93 0.04 25);
 
   --free: oklch(0.735 0.115 174);
   --free-soft: oklch(0.34 0.055 174);
