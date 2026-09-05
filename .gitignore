@@ -53,3 +53,9 @@ next-env.d.ts
 /Share-AI/
 /tools/
 __pycache__/
+
+# External AI tooling (not part of this project)
+/.understand-anything/
+/understand-anything/
+/.mem0/
+/mem0/
