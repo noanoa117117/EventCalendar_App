@@ -14,6 +14,13 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local AI tooling is outside the application (also excluded by .gitignore).
+    ".understand-anything/**",
+    "understand-anything/**",
+    ".mem0/**",
+    "mem0/**",
+    // Supabase CLI downloads generated service code here.
+    "supabase/.temp/**",
   ]),
 ]);
 

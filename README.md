@@ -2,6 +2,8 @@
 
 Next.js 16（App Router）+ Supabase。イベント、空き時間登録、企画、管理画面を実装済みです。進捗と未確認事項は、必ず [PROGRESS.md](./PROGRESS.md) を参照してください。
 
+依存関係の更新理由・脆弱性の残件・検証結果は [セキュリティ対応記録](./SECURITY_MAINTENANCE.md) を参照してください。
+
 ## 1. Supabaseプロジェクトを作成する
 
 1. https://supabase.com でプロジェクトを新規作成する（Tokyo推奨）。
@@ -21,10 +23,10 @@ SQL Editorでも同じ順序です。続けて `supabase/seed.sql` のメール�
 
 ## 3. ローカル開発・fixture
 
-Node.js 22以上、Docker、Supabase CLIが必要です。
+Node.js 22.23.4（`.nvmrc`）、Docker、Supabase CLIが必要です。Node.jsを切り替える場合は、`package.json` の `engines.node` にあるセキュリティ修正済みバージョンを使ってください。
 
 ```bash
-npm install
+npm ci
 npm run dev:local
 ```
 
